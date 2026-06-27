@@ -1,0 +1,67 @@
+from pydantic import BaseModel, Field
+from typing import List, Dict, Any, Optional
+from enum import Enum
+
+class TrajectoryMode(str, Enum):
+    """How strict the agent's tool execution path must be evaluated."""
+    EXACT = "EXACT"           # Must match expected tools in exact order
+    IN_ORDER = "IN_ORDER"     # Must contain expected tools in relative order
+    ANY_ORDER = "ANY_ORDER"   # Must contain expected tools, order doesn't matter
+
+class ToolCall(BaseModel):
+    """Represents a single tool invocation (MCP or local)."""
+    tool_name: str
+    args: Dict[str, Any]
+    
+class EDDTestCase(BaseModel):
+    """
+    The formal specification for a Vibe Coding test case.
+    Replaces the vague (question, answer, context) RAG setup.
+    """
+    case_id: str
+    input_prompt: str = Field(..., description="The user's initial natural language intent.")
+    expected_skill: Optional[str] = Field(None, description="The Agent Skill that should have been triggered.")
+    expected_tool_calls: List[ToolCall] = Field(default_factory=list)
+    trajectory_mode: TrajectoryMode = Field(default=TrajectoryMode.IN_ORDER)
+    rubric: List[str] = Field(
+        ..., 
+        description="List of natural language criteria for the LLM-as-a-judge (e.g., 'acknowledges duplicate', 'provides next step')"
+    )
+
+class AgentTrace(BaseModel):
+    """
+    The actual runtime trajectory captured from the agent (via OpenTelemetry/ADK).
+    """
+    session_id: str
+    triggered_skills: List[str]
+    executed_tools: List[ToolCall]
+    final_output: str
+    total_token_cost_usd: float
+
+class EvaluationDimensionScore(BaseModel):
+    """Scores mapped directly to the 7 dimensions of Vibe Coding Evaluation."""
+    intent_satisfaction: Optional[float] = Field(None, ge=0.0, le=1.0)
+    functional_correctness: Optional[float] = Field(None, ge=0.0, le=1.0)
+    trajectory_quality: Optional[float] = Field(None, ge=0.0, le=1.0)
+    cost_efficiency: Optional[float] = Field(None, ge=0.0, le=1.0)
+    safety_and_rai: Optional[float] = Field(None, ge=0.0, le=1.0)
+    reasoning: str = Field(..., description="The judge's justification for the scores.")
+
+class EvaluationResult(BaseModel):
+    """The final output payload for AgentCI."""
+    case_id: str
+    passed: bool
+    scores: EvaluationDimensionScore
+    trace_summary: AgentTrace
+
+class EvalRecord(BaseModel):
+    """Legacy evaluation record for RAG evaluation."""
+    question: str
+    answer: str
+    metadata: Optional[Dict[str, Any]] = None
+
+class EvalResult(BaseModel):
+    """Legacy evaluation result for RAG evaluation."""
+    record: EvalRecord
+    score: float
+    details: Dict[str, Any]

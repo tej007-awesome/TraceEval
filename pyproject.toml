@@ -1,0 +1,41 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "agentci"
+version = "0.1.0"
+description = "CI/CD and Evaluation Infrastructure for Autonomous Agents (Agentic Engineering)"
+authors = [
+    { name = "Your Name", email = "you@example.com" }
+]
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "typer>=0.9.0",
+    "rich>=13.7.0",
+    "pydantic>=2.0.0",
+    "pydantic-settings>=2.0.0",
+    "google-genai>=0.5.0",         # Official Gemini SDK for LLM-as-a-judge
+    "google-adk>=0.1.0",           # Google Agent Development Kit for execution traces
+    "opentelemetry-api>=1.20.0",   # Required for parsing Agent Trajectories
+    "opentelemetry-sdk>=1.20.0"
+]
+
+[project.scripts]
+agentci = "agentci.cli:app"
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.23.0",
+    "ruff>=0.3.0"
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
