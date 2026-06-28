@@ -28,6 +28,12 @@ env/
 .env
 .env.*
 
+## Skills
 SKILL.md
+
 # macOS
 .DS_Store
+
+# Local testing data
+examples/
+sample_data/
