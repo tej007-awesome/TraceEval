@@ -4,9 +4,9 @@ from enum import Enum
 
 class TrajectoryMode(str, Enum):
     """How strict the agent's tool execution path must be evaluated."""
-    EXACT = "EXACT"           # Must match expected tools in exact order
-    IN_ORDER = "IN_ORDER"     # Must contain expected tools in relative order
-    ANY_ORDER = "ANY_ORDER"   # Must contain expected tools, order doesn't matter
+    EXACT = "EXACT"           
+    IN_ORDER = "IN_ORDER"     
+    ANY_ORDER = "ANY_ORDER"  
 
 class ToolCall(BaseModel):
     """Represents a single tool invocation (MCP or local)."""
