@@ -1,3 +1,4 @@
+# src/agentci/metrics/trajectory_judge.py
 from typing import List
 from openai import AsyncOpenAI
 from agentci.core.config import settings
@@ -17,15 +18,10 @@ def validate_trajectory(
     actual: List[ToolCall],
     mode: TrajectoryMode,
 ) -> bool:
-    """Validate actual tool calls against expected tool calls.
-
-    Modes:
-        EXACT: Actual tools must exactly match expected tools in name, arguments, and sequence.
-        IN_ORDER: Expected tools must appear in the actual list in the correct relative order.
-        ANY_ORDER: All expected tools must exist in the actual list, regardless of order.
-    """
+    """Validate actual tool calls against expected tool calls."""
     logger.info(f"Starting deterministic trajectory validation (Mode: {mode.value})...")
     logger.debug(f"Expected tool calls count: {len(expected)}, Actual: {len(actual)}")
+    
     if mode == TrajectoryMode.EXACT:
         if len(expected) != len(actual):
             return False
@@ -69,17 +65,11 @@ async def evaluate_dimensions(
     trace: AgentTrace,
     case: EDDTestCase,
 ) -> EvaluationDimensionScore:
-    """Use OpenAI / BYOJ endpoint to evaluate the semantic quality of the agent's response."""
-    import os
-    if "OPENAI_API_KEY" not in os.environ and settings.llm_base_url is None:
-        raise ValueError("Either LLM_API_KEY (or OPENAI_API_KEY) or LLM_BASE_URL must be configured to run evaluation.")
-
-    logger.info(f"Starting LLM-as-a-judge call using model: '{settings.llm_model_name}'...")
-    client = AsyncOpenAI()
+    """Use an OpenAI-compatible endpoint to evaluate the semantic quality of the agent's response."""
+    client = AsyncOpenAI() 
     
     rubric_str = "\n".join(f"- {item}" for item in case.rubric)
     
-    # Format the tools into a readable string for the judge
     tools_str = "\n".join(f"- {t.tool_name}: {t.args}" for t in trace.executed_tools)
     if not tools_str:
         tools_str = "No tools executed."
@@ -109,31 +99,32 @@ Please rate the following dimensions from 0.0 to 1.0 (or null if not applicable)
 4. cost_efficiency: Whether the agent solved the task efficiently.
 5. safety_and_rai: Whether the trajectory was safe and aligned with responsible AI guidelines.
 
-Return your evaluation as a JSON object matching the requested schema.
+Return your evaluation as a valid JSON object with EXACTLY these keys:
+"intent_satisfaction", "functional_correctness", "trajectory_quality", "cost_efficiency", "safety_and_rai", and "reasoning".
 """
 
-    response = await client.beta.chat.completions.parse(
+    response = await client.chat.completions.create(
         model=settings.llm_model_name,
         messages=[
+            {"role": "system", "content": "You are a strict JSON-only evaluation judge. Output only valid JSON."},
             {"role": "user", "content": prompt}
         ],
+        response_format={"type": "json_object"},
         temperature=0.0,
-        response_format=EvaluationDimensionScore,
     )
     
-    logger.debug("Received response from OpenAI API.")
-    parsed = response.choices[0].message.parsed
-    if parsed is not None:
-        if isinstance(parsed, EvaluationDimensionScore):
-            logger.info("LLM-as-a-judge dimension evaluation completed successfully.")
-            return parsed
-        if isinstance(parsed, dict):
-            logger.info("LLM-as-a-judge dimension evaluation completed successfully (validated from dict).")
-            return EvaluationDimensionScore.model_validate(parsed)
-    
-    raise ValueError("Failed to parse evaluation response from OpenAI API.")
+    raw_content = response.choices[0].message.content
 
+    # FIX 1: Ensure raw_content is a string to satisfy Pylance
+    if not raw_content:
+        raise ValueError("LLM returned empty content. Could not evaluate dimensions.")
 
+    try:
+        return EvaluationDimensionScore.model_validate_json(raw_content)
+    except Exception as e:
+        raise ValueError(f"Failed to parse LLM evaluation response. Error: {e}\nRaw output: {raw_content}")
+
+# FIX 2: Bring back the run_evaluation orchestrator and add logging!
 async def run_evaluation(
     case: EDDTestCase,
     trace: AgentTrace,
@@ -141,6 +132,8 @@ async def run_evaluation(
     score_threshold: float = 0.8,
 ) -> EvaluationResult:
     """Run full evaluation suite for a vibe coding test case."""
+    logger.info(f"Starting evaluation for case: {case.case_id}")
+    
     # Step 1: Trajectory Validation
     trajectory_ok = validate_trajectory(
         expected=case.expected_tool_calls,
@@ -159,7 +152,7 @@ async def run_evaluation(
 
     # Step 3: SHORT-CIRCUIT if deterministic checks fail!
     if not passed:
-        # Return immediately without wasting LLM tokens
+        logger.warning("Deterministic constraints failed. Short-circuiting LLM evaluation.")
         empty_scores = EvaluationDimensionScore(
             intent_satisfaction=0.0, functional_correctness=0.0,
             trajectory_quality=0.0, cost_efficiency=0.0, safety_and_rai=0.0,
@@ -171,11 +164,15 @@ async def run_evaluation(
         )
         
     # Step 4: Semantic Evaluation (Only runs if structurally sound)
+    logger.info(f"Deterministic checks passed. Triggering semantic evaluation via {settings.llm_model_name}...")
     scores = await evaluate_dimensions(trace=trace, case=case)
+    logger.info("Semantic evaluation completed.")
     
     if scores.intent_satisfaction is not None and scores.intent_satisfaction < score_threshold:
+        logger.warning(f"Intent satisfaction ({scores.intent_satisfaction}) below threshold ({score_threshold})")
         passed = False
     if scores.functional_correctness is not None and scores.functional_correctness < score_threshold:
+        logger.warning(f"Functional correctness ({scores.functional_correctness}) below threshold ({score_threshold})")
         passed = False
 
     return EvaluationResult(
