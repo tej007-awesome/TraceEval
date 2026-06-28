@@ -18,8 +18,8 @@ AgentCI shifts the industry to **Evaluation-Driven Development**. Before an agen
 ### Core Features
 - **Trajectory Validation:** Enforce strict tool execution sequences (`EXACT`, `IN_ORDER`, `ANY_ORDER`) before evaluating semantic quality.
 - **Cost Circuit Breakers:** Track `total_token_cost_usd` per session to automatically block deployments that exhibit "Denial of Wallet" (DoW) infinite-loop behaviors.
-- **Multidimensional LLM-Judge:** Native integration with `google-genai` (Gemini 2.5) to score agents across Intent Satisfaction, Functional Correctness, Trajectory Quality, and Safety & RAI.
-- **Terminal-Native DX:** Built on `Typer` and `Rich` for beautiful, actionable CI/CD pipeline outputs.
+- **Multidimensional LLM-Judge:** Native integration with `google-genai` (Gemini Flash/Pro) to score agents across Intent Satisfaction, Functional Correctness, Trajectory Quality, and Safety.
+- **Live CI/CD Hooks & Exports:** Dynamically execute live Python agents in memory, evaluate them on the fly, and export results to JSON for CI/CD pipeline gating.
 
 ---
 
@@ -42,16 +42,24 @@ Create a `.env` file in the root directory and add your Google Gemini Developer 
 GEMINI_API_KEY="AIzaSy..."
 ```
 
-### 3. Run Your First Evaluation
-AgentCI operates on two files: a **Case** (the EDD specification) and a **Trace** (the actual runtime execution logs from the agent).
+### 3. Run an Evaluation
 
+**Mode A: Evaluate a Static/Historical Trace**
+Perfect for daily log auditing and regression testing.
 ```bash
 agentci run --case sample_data/case_01.json --trace sample_data/trace_01.json
+```
+
+**Mode B: Evaluate a Live Agent Pipeline**
+Perfect for pre-deployment CI/CD gating. Dynamically spawns your agent, captures its trace, evaluates it, and exports the report.
+```bash
+agentci run --case sample_data/case_01.json --pipeline examples.reference_agent:process_refund --export report.json
 ```
 
 **Expected Output:**
 ```text
 AgentCI initializing...
+Mode: Live Pipeline execution (examples.reference_agent:process_refund)
 
 ⠧ Evaluating Vibe Trajectory & Dimensions via Gemini...
 
@@ -69,12 +77,13 @@ Case ID: refund_001
 │ Safety & RAI           │   1.0 │
 └────────────────────────┴───────┘
 ╭──────────────────────── LLM Judge Reasoning ─────────────────────────╮
-│ The agent fully satisfied the user's intent by acknowledging the     │
-│ duplicate charge and confirming that a full refund has been issued.  │
-│ The executed trajectory was logical and efficient, using necessary   │
-│ tools (lookup_order, check_duplicate_charge, issue_refund) without   │
-│ any redundant steps.                                                 │
+│ The agent fully satisfied the user's intent by verifying the         │
+│ duplicate charge and issuing a full refund for order #4521. The      │
+│ final output is functionally correct. The tool trajectory was        │
+│ optimal, using 'lookup_order', 'check_duplicate_charge', and         │
+│ 'issue_refund' without any redundant steps.                          │
 ╰──────────────────────────────────────────────────────────────────────╯
+Report successfully exported to report.json
 ```
 
 ---
@@ -88,10 +97,19 @@ AgentCI decouples the **Ingestion Layer** from the **Evaluation Engine** using s
 
 ---
 
-## 🗺️ Roadmap (V1)
-- [x] **v0.1:** Static Trace Evaluation (EDD Schema, Trajectory Validator, LLM-Judge)
-- [ ] **v0.2:** Live Pipeline Hook (Dynamically spawn agents, capture traces, and evaluate in real-time)
-- [ ] **v0.3:** Automated Green Teaming (Auto-refactor failing `SKILL.md` files)
-- [ ] **v0.4:** Prefect Orchestration (Distributed CI/CD scheduling)
+## Vision & What's Next (V1)
+
+We have successfully shipped **v0** (Core EDD Schema, Trajectory Validator, Live Pipeline Hook). To track the granular V1 roadmap, please see our [GitHub Issues](https://github.com/tej007-awesome/AgentCI/issues).
+
+Upcoming architectural milestones include:
+- **Universal OpenTelemetry Adapters:** Abstracting the Ingestion layer so AgentCI can seamlessly evaluate traces from LangGraph, OpenAI Swarm, Claude SDK, or raw MCP servers.
+- **Automated Green Teaming:** Automatically auto-refactoring failing `SKILL.md` files if a trajectory triggers a security violation.
+- **Prefect Orchestration:** Distributed CI/CD scheduling for high-volume enterprise workloads.
 
 ---
+
+## YC Alignment
+This project is built explicitly to answer **YC Summer 2026 Requests for Startups**:
+*   **#12 — Software for Agents:** Agents are the next trillion internet users. AgentCI provides the machine-readable, programmatic testing infrastructure required to deploy them safely.
+*   **#15 — The AI Operating System for Companies:** AgentCI acts as the "Kernel Panic monitor" and compliance gateway for the enterprise AI OS, making autonomous behavior legible and controllable to stakeholders.
+```
