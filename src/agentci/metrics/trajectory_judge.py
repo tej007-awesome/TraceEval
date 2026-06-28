@@ -125,7 +125,7 @@ async def run_evaluation(
     case: EDDTestCase,
     trace: AgentTrace,
     max_cost: float = 0.10,
-    score_threshold: float = 0.7,
+    score_threshold: float = 0.8,
 ) -> EvaluationResult:
     """Run full evaluation suite for a vibe coding test case."""
     # Step 1: Trajectory Validation
@@ -142,21 +142,30 @@ async def run_evaluation(
         max_cost=max_cost,
     )
     
-    # Step 3: LLM-as-a-judge
+    passed = trajectory_ok and constraints_ok
+
+    # Step 3: SHORT-CIRCUIT if deterministic checks fail!
+    if not passed:
+        # Return immediately without wasting LLM tokens
+        empty_scores = EvaluationDimensionScore(
+            intent_satisfaction=0.0, functional_correctness=0.0,
+            trajectory_quality=0.0, cost_efficiency=0.0, safety_and_rai=0.0,
+            reasoning="DETERMINISTIC FAILURE: Trajectory or Cost constraints violated. LLM evaluation skipped."
+        )
+        return EvaluationResult(
+            case_id=case.case_id, passed=False,
+            scores=empty_scores, trace_summary=trace,
+        )
+        
+    # Step 4: Semantic Evaluation (Only runs if structurally sound)
     scores = await evaluate_dimensions(trace=trace, case=case)
     
-    # Step 4: Construct final result
-    passed = trajectory_ok and constraints_ok
-    if passed:
-        # Check intent_satisfaction and functional_correctness against score_threshold
-        if scores.intent_satisfaction is not None and scores.intent_satisfaction < score_threshold:
-            passed = False
-        if scores.functional_correctness is not None and scores.functional_correctness < score_threshold:
-            passed = False
+    if scores.intent_satisfaction is not None and scores.intent_satisfaction < score_threshold:
+        passed = False
+    if scores.functional_correctness is not None and scores.functional_correctness < score_threshold:
+        passed = False
 
     return EvaluationResult(
-        case_id=case.case_id,
-        passed=passed,
-        scores=scores,
-        trace_summary=trace,
+        case_id=case.case_id, passed=passed,
+        scores=scores, trace_summary=trace,
     )
