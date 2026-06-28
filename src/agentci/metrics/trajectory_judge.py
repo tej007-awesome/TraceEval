@@ -1,4 +1,3 @@
-# src/agentci/metrics/trajectory_judge.py
 from typing import List
 from openai import AsyncOpenAI
 from agentci.core.config import settings
