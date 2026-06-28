@@ -99,21 +99,23 @@ def test_validate_system_constraints():
         input_prompt="Test prompt",
         expected_skill=None,
         expected_tool_calls=[],
+        trajectory_mode=TrajectoryMode.IN_ORDER,
         rubric=[]
     )
     assert validate_system_constraints(trace_wrong_skill, case_no_skill) is True
 
 @pytest.mark.asyncio
-@patch("google.genai.Client")
-async def test_evaluate_dimensions(mock_genai_client_class):
+@patch("agentci.metrics.trajectory_judge.AsyncOpenAI")
+async def test_evaluate_dimensions(mock_async_openai_class, monkeypatch):
+    monkeypatch.setenv("OPENAI_API_KEY", "mock-key")
     # Setup mocks
     mock_client = MagicMock()
-    mock_aio = AsyncMock()
-    mock_aio.__aenter__.return_value = mock_aio
-    mock_client.aio = mock_aio
-    mock_genai_client_class.return_value = mock_client
+    mock_async_openai_class.return_value = mock_client
     
     mock_response = MagicMock()
+    mock_choice = MagicMock()
+    mock_message = MagicMock()
+    
     mock_score = EvaluationDimensionScore(
         intent_satisfaction=0.9,
         functional_correctness=0.85,
@@ -122,13 +124,18 @@ async def test_evaluate_dimensions(mock_genai_client_class):
         safety_and_rai=1.0,
         reasoning="Good implementation"
     )
-    mock_response.parsed = mock_score
-    mock_aio.models.generate_content.return_value = mock_response
+    mock_message.parsed = mock_score
+    mock_choice.message = mock_message
+    mock_response.choices = [mock_choice]
+    
+    mock_client.beta.chat.completions.parse = AsyncMock(return_value=mock_response)
 
     case = EDDTestCase(
         case_id="case_1",
         input_prompt="Prompt",
+        expected_skill=None,
         expected_tool_calls=[],
+        trajectory_mode=TrajectoryMode.IN_ORDER,
         rubric=["check 1"]
     )
     trace = AgentTrace(
@@ -141,7 +148,7 @@ async def test_evaluate_dimensions(mock_genai_client_class):
 
     result = await evaluate_dimensions(trace, case)
     assert result == mock_score
-    mock_aio.models.generate_content.assert_called_once()
+    mock_client.beta.chat.completions.parse.assert_called_once()
 
 @pytest.mark.asyncio
 @patch("agentci.metrics.trajectory_judge.evaluate_dimensions")
@@ -149,6 +156,9 @@ async def test_run_evaluation(mock_eval_dimensions):
     mock_score = EvaluationDimensionScore(
         intent_satisfaction=0.9,
         functional_correctness=0.9,
+        trajectory_quality=1.0,
+        cost_efficiency=0.8,
+        safety_and_rai=1.0,
         reasoning="Passed"
     )
     mock_eval_dimensions.return_value = mock_score
@@ -198,6 +208,9 @@ async def test_run_evaluation(mock_eval_dimensions):
     mock_low_score = EvaluationDimensionScore(
         intent_satisfaction=0.5,
         functional_correctness=0.9,
+        trajectory_quality=1.0,
+        cost_efficiency=0.8,
+        safety_and_rai=1.0,
         reasoning="Intent not fully satisfied"
     )
     mock_eval_dimensions.return_value = mock_low_score

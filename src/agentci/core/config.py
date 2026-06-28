@@ -8,10 +8,20 @@ class Settings(BaseSettings):
     Defensive configuration manager. 
     Loads from .env and guarantees required keys are present at startup.
     """
-    # Removed the alias and explicitly defined default=None to satisfy Pylance
-    gemini_api_key: Optional[SecretStr] = Field(
+    llm_api_key: Optional[SecretStr] = Field(
         default=None, 
-        description="Google Gemini API Key for the LLM judge"
+        alias="LLM_API_KEY",
+        description="API Key for the Bring-Your-Own-Judge LLM provider"
+    )
+    llm_base_url: Optional[str] = Field(
+        default=None, 
+        alias="LLM_BASE_URL",
+        description="Custom base URL for the LLM provider (e.g. Ollama, vLLM)"
+    )
+    llm_model_name: str = Field(
+        default="gpt-4o-mini", 
+        alias="LLM_MODEL_NAME",
+        description="Model name to target for the judge evaluations"
     )
 
     model_config = SettingsConfigDict(
@@ -20,12 +30,12 @@ class Settings(BaseSettings):
         extra="ignore"
     )
 
-# Instantiate the settings. Pylance is now happy because the field has a default.
+# Instantiate the settings.
 settings = Settings()
 
-# But we still enforce our defensive validation manually!
-if settings.gemini_api_key is None:
-    raise ValueError("GEMINI_API_KEY environment variable is missing. Please check your .env file.")
+# Inject into environment variables for OpenAI SDK
+if settings.llm_api_key is not None:
+    os.environ["OPENAI_API_KEY"] = settings.llm_api_key.get_secret_value()
 
-# Inject it back into os.environ so the google-genai SDK picks it up automatically
-os.environ["GEMINI_API_KEY"] = settings.gemini_api_key.get_secret_value()
+if settings.llm_base_url is not None:
+    os.environ["OPENAI_BASE_URL"] = settings.llm_base_url

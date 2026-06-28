@@ -27,11 +27,15 @@ app = typer.Typer(
 )
 
 @app.callback()
-def main():
+def main(
+    verbose: bool = typer.Option(False, "--verbose", "-v", help="Enable verbose logging")
+):
     """
     AgentCI: The CI/CD gate for Agentic Engineering.
     """
-    pass
+    if verbose:
+        from agentci.core.logger import set_verbose_mode
+        set_verbose_mode()
 
 @app.command()
 def run(
@@ -41,8 +45,12 @@ def run(
     export_path: Optional[str] = typer.Option(None, "--export", "-e", help="Path to save the JSON EvaluationResult"),
 ):
     """Run an AgentCI evaluation against a static trace or a live agent pipeline."""
-    console.print("[bold blue]AgentCI[/bold blue] initializing...")
-    
+    import os
+    if "OPENAI_API_KEY" not in os.environ and settings.llm_base_url is None:
+        console.print("\n[bold red]Configuration Error:[/bold red]")
+        console.print("Either LLM_API_KEY (or OPENAI_API_KEY) or LLM_BASE_URL must be configured.")
+        raise typer.Exit(code=1)
+
     if not trace_file and not pipeline:
         console.print("[bold red]Error:[/bold red] You must provide either a static --trace file or a live --pipeline hook.")
         raise typer.Exit(code=1)
@@ -64,7 +72,7 @@ def run(
         console.print(f"[bold red]Ingestion Error:[/bold red] {e}")
         raise typer.Exit(code=1)
 
-    with console.status("[bold yellow]Evaluating Vibe Trajectory & Dimensions via Gemini...", spinner="dots"):
+    with console.status(f"[bold yellow]Evaluating Vibe Trajectory & Dimensions via {settings.llm_model_name}...", spinner="dots"):
         try:
             result = asyncio.run(run_evaluation(case, trace))
         except Exception as e:

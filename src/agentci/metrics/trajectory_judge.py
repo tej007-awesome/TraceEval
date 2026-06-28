@@ -1,6 +1,7 @@
 from typing import List
-from google import genai
-from google.genai import types
+from openai import AsyncOpenAI
+from agentci.core.config import settings
+from agentci.core.logger import logger
 
 from agentci.core.schema import (
     TrajectoryMode,
@@ -23,6 +24,8 @@ def validate_trajectory(
         IN_ORDER: Expected tools must appear in the actual list in the correct relative order.
         ANY_ORDER: All expected tools must exist in the actual list, regardless of order.
     """
+    logger.info(f"Starting deterministic trajectory validation (Mode: {mode.value})...")
+    logger.debug(f"Expected tool calls count: {len(expected)}, Actual: {len(actual)}")
     if mode == TrajectoryMode.EXACT:
         if len(expected) != len(actual):
             return False
@@ -52,22 +55,31 @@ def validate_system_constraints(
     max_cost: float = 0.10,
 ) -> bool:
     """Validate system constraints like cost budget and required skills."""
+    logger.info(f"Checking system constraints (Max Cost budget: ${max_cost:.4f}, Actual Cost: ${trace.total_token_cost_usd:.4f})...")
     if trace.total_token_cost_usd > max_cost:
+        logger.warning(f"Constraint Failed: Total token cost (${trace.total_token_cost_usd:.4f}) exceeds budget (${max_cost:.4f})")
         return False
     if case.expected_skill is not None and case.expected_skill not in trace.triggered_skills:
+        logger.warning(f"Constraint Failed: Expected skill '{case.expected_skill}' was not triggered (Triggered: {trace.triggered_skills})")
         return False
+    logger.info("System constraints checks PASSED.")
     return True
 
 async def evaluate_dimensions(
     trace: AgentTrace,
     case: EDDTestCase,
 ) -> EvaluationDimensionScore:
-    """Use Gemini (LLM-as-a-Judge) to evaluate the semantic quality of the agent's response."""
-    client = genai.Client()
+    """Use OpenAI / BYOJ endpoint to evaluate the semantic quality of the agent's response."""
+    import os
+    if "OPENAI_API_KEY" not in os.environ and settings.llm_base_url is None:
+        raise ValueError("Either LLM_API_KEY (or OPENAI_API_KEY) or LLM_BASE_URL must be configured to run evaluation.")
+
+    logger.info(f"Starting LLM-as-a-judge call using model: '{settings.llm_model_name}'...")
+    client = AsyncOpenAI()
     
     rubric_str = "\n".join(f"- {item}" for item in case.rubric)
     
-    # NEW: Format the tools into a readable string for the judge
+    # Format the tools into a readable string for the judge
     tools_str = "\n".join(f"- {t.tool_name}: {t.args}" for t in trace.executed_tools)
     if not tools_str:
         tools_str = "No tools executed."
@@ -100,25 +112,26 @@ Please rate the following dimensions from 0.0 to 1.0 (or null if not applicable)
 Return your evaluation as a JSON object matching the requested schema.
 """
 
-    async with client.aio as aclient:
-        response = await aclient.models.generate_content(
-            model="gemini-2.5-flash", 
-            contents=prompt,
-            config=types.GenerateContentConfig(
-                response_mime_type="application/json",
-                response_schema=EvaluationDimensionScore,
-                temperature=0.0, # NEW: Set temperature to 0 for deterministic evaluations
-            ),
-        )
+    response = await client.beta.chat.completions.parse(
+        model=settings.llm_model_name,
+        messages=[
+            {"role": "user", "content": prompt}
+        ],
+        temperature=0.0,
+        response_format=EvaluationDimensionScore,
+    )
     
-    parsed = getattr(response, "parsed", None)
+    logger.debug("Received response from OpenAI API.")
+    parsed = response.choices[0].message.parsed
     if parsed is not None:
         if isinstance(parsed, EvaluationDimensionScore):
+            logger.info("LLM-as-a-judge dimension evaluation completed successfully.")
             return parsed
         if isinstance(parsed, dict):
+            logger.info("LLM-as-a-judge dimension evaluation completed successfully (validated from dict).")
             return EvaluationDimensionScore.model_validate(parsed)
     
-    raise ValueError("Failed to parse evaluation response from Gemini API.")
+    raise ValueError("Failed to parse evaluation response from OpenAI API.")
 
 
 async def run_evaluation(
