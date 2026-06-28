@@ -7,7 +7,7 @@ name = "agentci"
 version = "0.1.0"
 description = "CI/CD and Evaluation Infrastructure for Autonomous Agents (Agentic Engineering)"
 authors = [
-    { name = "Your Name", email = "you@example.com" }
+    { name = "Tejas Rajesh", email = "tejasrajesh05@gmail.com" }
 ]
 readme = "README.md"
 requires-python = ">=3.11"
