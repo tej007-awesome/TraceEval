@@ -1,3 +1,4 @@
+```markdown
 # AgentCI: Continuous Effective Trust for Autonomous Agents
 
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
@@ -18,18 +19,24 @@ AgentCI shifts the industry to **Evaluation-Driven Development**. Before an agen
 ### Core Features
 - **Trajectory Validation:** Enforce strict tool execution sequences (`EXACT`, `IN_ORDER`, `ANY_ORDER`) before evaluating semantic quality.
 - **Cost Circuit Breakers:** Track `total_token_cost_usd` per session to automatically block deployments that exhibit "Denial of Wallet" (DoW) infinite-loop behaviors.
-- **Multidimensional LLM-Judge:** Native integration with `google-genai` (Gemini Flash/Pro) to score agents across Intent Satisfaction, Functional Correctness, Trajectory Quality, and Safety.
+- **Provider-Agnostic LLM-Judge:** Bring Your Own Judge (BYOJ). Evaluate traces using OpenAI, local models (vLLM/Ollama), or proxies (OpenRouter) via the universal OpenAI SDK standard.
 - **Live CI/CD Hooks & Exports:** Dynamically execute live Python agents in memory, evaluate them on the fly, and export results to JSON for CI/CD pipeline gating.
+- **Middleware Observability:** Zero-performance-impact logging. Run with `--verbose` to inspect ingestion boundaries and judge latency.
 
 ---
 
 ## Quickstart
 
 ### 1. Installation
-AgentCI is built for speed. We recommend using `uv` for lightning-fast dependency resolution.
 
+**For End-Users & CI/CD Pipelines:**
 ```bash
-git clone https://github.com/yourusername/AgentCI.git
+pip install agentci
+```
+
+**For Contributors:**
+```bash
+git clone https://github.com/tej007-awesome/AgentCI.git
 cd AgentCI
 uv venv
 source .venv/bin/activate
@@ -37,9 +44,17 @@ uv pip install -e ".[dev]"
 ```
 
 ### 2. Configuration
-Create a `.env` file in the root directory and add your Google Gemini Developer API key:
+Create a `.env` file in your root directory. AgentCI is provider-agnostic.
+
 ```env
-GEMINI_API_KEY="AIzaSy..."
+# Example A: Standard OpenAI
+LLM_API_KEY="sk-proj-..."
+LLM_MODEL_NAME="gpt-4o-mini"
+
+# Example B: Local/Proxy (e.g., OpenRouter, vLLM, Ollama)
+LLM_API_KEY="your-proxy-key"
+LLM_BASE_URL="https://openrouter.ai/api/v1"
+LLM_MODEL_NAME="nvidia/nemotron-3-ultra-550b-a55b:free"
 ```
 
 ### 3. Run an Evaluation
@@ -53,15 +68,17 @@ agentci run --case sample_data/case_01.json --trace sample_data/trace_01.json
 **Mode B: Evaluate a Live Agent Pipeline**
 Perfect for pre-deployment CI/CD gating. Dynamically spawns your agent, captures its trace, evaluates it, and exports the report.
 ```bash
-agentci run --case sample_data/case_01.json --pipeline examples.reference_agent:process_refund --export report.json
+agentci run --case sample_data/case_01.json --pipeline examples.reference_agent:process_refund_success --export report.json
 ```
+
+*(Tip: Add `--verbose` right after `agentci` to view detailed middleware logs!)*
 
 **Expected Output:**
 ```text
 AgentCI initializing...
-Mode: Live Pipeline execution (examples.reference_agent:process_refund)
+Mode: Live Pipeline execution (examples.reference_agent:process_refund_success)
 
-⠧ Evaluating Vibe Trajectory & Dimensions via Gemini...
+⠧ Evaluating Vibe Trajectory & Dimensions via nvidia/nemotron-3-ultra-550b-a55b:free...
 
 Result: PASSED (Safe to Deploy)
 Case ID: refund_001
@@ -77,11 +94,11 @@ Case ID: refund_001
 │ Safety & RAI           │   1.0 │
 └────────────────────────┴───────┘
 ╭──────────────────────── LLM Judge Reasoning ─────────────────────────╮
-│ The agent fully satisfied the user's intent by verifying the         │
-│ duplicate charge and issuing a full refund for order #4521. The      │
-│ final output is functionally correct. The tool trajectory was        │
-│ optimal, using 'lookup_order', 'check_duplicate_charge', and         │
-│ 'issue_refund' without any redundant steps.                          │
+│ The agent fully addressed the user's intent by verifying the         │
+│ duplicate charge and issuing a full refund, as reflected in the      │
+│ final output. The tool trajectory is logically ordered (lookup,      │
+│ verify, refund) with no redundant calls. The process is efficient,   │
+│ using only necessary steps. No safety or ethical concerns present.   │
 ╰──────────────────────────────────────────────────────────────────────╯
 Report successfully exported to report.json
 ```
@@ -99,7 +116,7 @@ AgentCI decouples the **Ingestion Layer** from the **Evaluation Engine** using s
 
 ## Vision & What's Next (V1)
 
-We have successfully shipped **v0** (Core EDD Schema, Trajectory Validator, Live Pipeline Hook). To track the granular V1 roadmap, please see our [GitHub Issues](https://github.com/tej007-awesome/AgentCI/issues).
+We have successfully shipped **v0** (Core EDD Schema, Trajectory Validator, BYOJ Engine, Live Pipeline Hook). To track the granular V1 roadmap, please see our [GitHub Issues](https://github.com/tej007-awesome/AgentCI/issues).
 
 Upcoming architectural milestones include:
 - **Universal OpenTelemetry Adapters:** Abstracting the Ingestion layer so AgentCI can seamlessly evaluate traces from LangGraph, OpenAI Swarm, Claude SDK, or raw MCP servers.
@@ -112,4 +129,3 @@ Upcoming architectural milestones include:
 This project is built explicitly to answer **YC Summer 2026 Requests for Startups**:
 *   **#12 — Software for Agents:** Agents are the next trillion internet users. AgentCI provides the machine-readable, programmatic testing infrastructure required to deploy them safely.
 *   **#15 — The AI Operating System for Companies:** AgentCI acts as the "Kernel Panic monitor" and compliance gateway for the enterprise AI OS, making autonomous behavior legible and controllable to stakeholders.
-```

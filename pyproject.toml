@@ -16,10 +16,7 @@ dependencies = [
     "rich>=13.7.0",
     "pydantic>=2.0.0",
     "pydantic-settings>=2.0.0",
-    "openai>=1.14.0",              # Universal LLM client for Bring-Your-Own-Judge
-    "google-adk>=0.1.0",           # Google Agent Development Kit for execution traces
-    "opentelemetry-api>=1.20.0",   # Required for parsing Agent Trajectories
-    "opentelemetry-sdk>=1.20.0"
+    "openai>=1.14.0"              # Universal LLM client for Bring-Your-Own-Judge
 ]
 
 [project.scripts]

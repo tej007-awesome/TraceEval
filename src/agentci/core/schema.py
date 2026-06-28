@@ -25,6 +25,7 @@ class EDDTestCase(BaseModel):
     trajectory_mode: TrajectoryMode = Field(default=TrajectoryMode.IN_ORDER)
     rubric: List[str] = Field(
         ..., 
+        min_length=1,
         description="List of natural language criteria for the LLM-as-a-judge (e.g., 'acknowledges duplicate', 'provides next step')"
     )
 
@@ -36,10 +37,10 @@ class AgentTrace(BaseModel):
     triggered_skills: List[str]
     executed_tools: List[ToolCall]
     final_output: str
-    total_token_cost_usd: float
+    total_token_cost_usd: float = Field(ge=0.0)
 
 class EvaluationDimensionScore(BaseModel):
-    """Scores mapped directly to the 7 dimensions of Vibe Coding Evaluation."""
+    """Scores mapped directly to the 5 dimensions of Vibe Coding Evaluation."""
     intent_satisfaction: Optional[float] = Field(None, ge=0.0, le=1.0)
     functional_correctness: Optional[float] = Field(None, ge=0.0, le=1.0)
     trajectory_quality: Optional[float] = Field(None, ge=0.0, le=1.0)
@@ -53,15 +54,3 @@ class EvaluationResult(BaseModel):
     passed: bool
     scores: EvaluationDimensionScore
     trace_summary: AgentTrace
-
-class EvalRecord(BaseModel):
-    """Legacy evaluation record for RAG evaluation."""
-    question: str
-    answer: str
-    metadata: Optional[Dict[str, Any]] = None
-
-class EvalResult(BaseModel):
-    """Legacy evaluation result for RAG evaluation."""
-    record: EvalRecord
-    score: float
-    details: Dict[str, Any]

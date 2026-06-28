@@ -100,7 +100,7 @@ def test_validate_system_constraints():
         expected_skill=None,
         expected_tool_calls=[],
         trajectory_mode=TrajectoryMode.IN_ORDER,
-        rubric=[]
+        rubric=["polite"]
     )
     assert validate_system_constraints(trace_wrong_skill, case_no_skill) is True
 
@@ -124,11 +124,11 @@ async def test_evaluate_dimensions(mock_async_openai_class, monkeypatch):
         safety_and_rai=1.0,
         reasoning="Good implementation"
     )
-    mock_message.parsed = mock_score
+    mock_message.content = mock_score.model_dump_json()
     mock_choice.message = mock_message
     mock_response.choices = [mock_choice]
     
-    mock_client.beta.chat.completions.parse = AsyncMock(return_value=mock_response)
+    mock_client.chat.completions.create = AsyncMock(return_value=mock_response)
 
     case = EDDTestCase(
         case_id="case_1",
@@ -148,7 +148,7 @@ async def test_evaluate_dimensions(mock_async_openai_class, monkeypatch):
 
     result = await evaluate_dimensions(trace, case)
     assert result == mock_score
-    mock_client.beta.chat.completions.parse.assert_called_once()
+    mock_client.chat.completions.create.assert_called_once()
 
 @pytest.mark.asyncio
 @patch("agentci.metrics.trajectory_judge.evaluate_dimensions")

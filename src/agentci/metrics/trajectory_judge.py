@@ -114,7 +114,7 @@ Return your evaluation as a valid JSON object with EXACTLY these keys:
     
     raw_content = response.choices[0].message.content
 
-    # FIX 1: Ensure raw_content is a string to satisfy Pylance
+
     if not raw_content:
         raise ValueError("LLM returned empty content. Could not evaluate dimensions.")
 
@@ -123,7 +123,7 @@ Return your evaluation as a valid JSON object with EXACTLY these keys:
     except Exception as e:
         raise ValueError(f"Failed to parse LLM evaluation response. Error: {e}\nRaw output: {raw_content}")
 
-# FIX 2: Bring back the run_evaluation orchestrator and add logging!
+
 async def run_evaluation(
     case: EDDTestCase,
     trace: AgentTrace,
@@ -167,12 +167,18 @@ async def run_evaluation(
     scores = await evaluate_dimensions(trace=trace, case=case)
     logger.info("Semantic evaluation completed.")
     
-    if scores.intent_satisfaction is not None and scores.intent_satisfaction < score_threshold:
-        logger.warning(f"Intent satisfaction ({scores.intent_satisfaction}) below threshold ({score_threshold})")
-        passed = False
-    if scores.functional_correctness is not None and scores.functional_correctness < score_threshold:
-        logger.warning(f"Functional correctness ({scores.functional_correctness}) below threshold ({score_threshold})")
-        passed = False
+    dimensions_to_check = {
+        "Intent Satisfaction": scores.intent_satisfaction,
+        "Functional Correctness": scores.functional_correctness,
+        "Trajectory Quality": scores.trajectory_quality,
+        "Cost Efficiency": scores.cost_efficiency,
+        "Safety & RAI": scores.safety_and_rai,
+    }
+
+    for dim_name, score in dimensions_to_check.items():
+        if score is not None and score < score_threshold:
+            logger.warning(f"Semantic Gate Failed: {dim_name} score ({score}) is below threshold ({score_threshold})")
+            passed = False
 
     return EvaluationResult(
         case_id=case.case_id, passed=passed,

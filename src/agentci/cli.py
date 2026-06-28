@@ -43,6 +43,8 @@ def run(
     trace_file: Optional[Path] = typer.Option(None, "--trace", "-t", help="Path to static AgentTrace JSON"),
     pipeline: Optional[str] = typer.Option(None, "--pipeline", "-p", help="Live agent function (e.g. 'examples.reference_agent:process_refund')"),
     export_path: Optional[str] = typer.Option(None, "--export", "-e", help="Path to save the JSON EvaluationResult"),
+    max_cost: float = typer.Option(0.10, "--max-cost", help="Maximum allowable session budget in USD"),
+    score_threshold: float = typer.Option(0.8, "--score-threshold", help="Minimum score threshold for intent/correctness"),
 ):
     """Run an AgentCI evaluation against a static trace or a live agent pipeline."""
     import os
@@ -74,7 +76,7 @@ def run(
 
     with console.status(f"[bold yellow]Evaluating Vibe Trajectory & Dimensions via {settings.llm_model_name}...", spinner="dots"):
         try:
-            result = asyncio.run(run_evaluation(case, trace))
+            result = asyncio.run(run_evaluation(case, trace, max_cost=max_cost, score_threshold=score_threshold))
         except Exception as e:
             console.print(f"\n[bold red]Evaluation Engine Error:[/bold red] {e}")
             raise typer.Exit(code=1)
