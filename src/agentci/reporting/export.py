@@ -1,33 +1,13 @@
-# src/agentci/reporting/export.py
-"""Export reporting utilities.
-
-Provides functions to serialize evaluation results to JSON files.
-"""
-
-import json
 from pathlib import Path
-from typing import List
+from agentci.core.schema import EvaluationResult
 
-from ..core.schema import EvalResult
-
-def export_results(results: List[EvalResult], output_path: str) -> None:
-    """Export evaluation results to a JSON file.
-
-    Args:
-        results: List of ``EvalResult`` objects.
-        output_path: Destination file path (will be created if missing).
-    """
-    serializable = []
-    for r in results:
-        item = {
-            "question": r.record.question,
-            "answer": r.record.answer,
-            "metadata": r.record.metadata,
-            "score": r.score,
-            "details": r.details,
-        }
-        serializable.append(item)
-    path = Path(output_path)
+def export_to_json(result: EvaluationResult, export_path: str) -> None:
+    """Exports the EvaluationResult to a JSON file."""
+    path = Path(export_path)
+    
+    # Ensure the parent directories exist
     path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("w", encoding="utf-8") as f:
-        json.dump(serializable, f, indent=2, ensure_ascii=False)
+    
+    # Write the Pydantic model to JSON
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(result.model_dump_json(indent=2))

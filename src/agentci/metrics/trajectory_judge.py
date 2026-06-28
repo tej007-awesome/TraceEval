@@ -111,9 +111,13 @@ Return your evaluation as a JSON object matching the requested schema.
             ),
         )
     
-    if getattr(response, "parsed", None) is not None:
-        return response.parsed
-        
+    parsed = getattr(response, "parsed", None)
+    if parsed is not None:
+        if isinstance(parsed, EvaluationDimensionScore):
+            return parsed
+        if isinstance(parsed, dict):
+            return EvaluationDimensionScore.model_validate(parsed)
+    
     raise ValueError("Failed to parse evaluation response from Gemini API.")
 
 

@@ -2,10 +2,12 @@ import sys
 import asyncio
 import typer
 from pathlib import Path
+from typing import Optional
 from agentci.loaders.file import load_test_case, load_trace
+from agentci.loaders.live import run_live_pipeline
 from agentci.metrics.trajectory_judge import run_evaluation
 from agentci.reporting.console import render_result, console
-
+from agentci.reporting.export import export_to_json
 
 from rich.console import Console
 _startup_console = Console()
@@ -34,16 +36,32 @@ def main():
 @app.command()
 def run(
     case_file: Path = typer.Option(..., "--case", "-c", help="Path to EDDTestCase JSON"),
-    trace_file: Path = typer.Option(..., "--trace", "-t", help="Path to AgentTrace JSON"),
+    trace_file: Optional[Path] = typer.Option(None, "--trace", "-t", help="Path to static AgentTrace JSON"),
+    pipeline: Optional[str] = typer.Option(None, "--pipeline", "-p", help="Live agent function (e.g. 'examples.reference_agent:process_refund')"),
+    export_path: Optional[str] = typer.Option(None, "--export", "-e", help="Path to save the JSON EvaluationResult"),
 ):
-    """Run an AgentCI evaluation against a captured agent trace."""
+    """Run an AgentCI evaluation against a static trace or a live agent pipeline."""
     console.print("[bold blue]AgentCI[/bold blue] initializing...")
+    
+    if not trace_file and not pipeline:
+        console.print("[bold red]Error:[/bold red] You must provide either a static --trace file or a live --pipeline hook.")
+        raise typer.Exit(code=1)
     
     try:
         case = load_test_case(case_file)
-        trace = load_trace(trace_file)
+        
+        # Determine Execution Mode (Static vs Live)
+        if pipeline:
+            console.print(f"[dim]Mode: Live Pipeline execution ({pipeline})[/dim]")
+            trace = run_live_pipeline(pipeline, case)
+        elif trace_file:
+            console.print(f"[dim]Mode: Static Batch execution ({trace_file})[/dim]")
+            trace = load_trace(trace_file)
+        else:
+            raise ValueError("No trace file or pipeline provided.")
+            
     except Exception as e:
-        console.print(f"[bold red]Data Load Error:[/bold red] {e}")
+        console.print(f"[bold red]Ingestion Error:[/bold red] {e}")
         raise typer.Exit(code=1)
 
     with console.status("[bold yellow]Evaluating Vibe Trajectory & Dimensions via Gemini...", spinner="dots"):
@@ -53,7 +71,13 @@ def run(
             console.print(f"\n[bold red]Evaluation Engine Error:[/bold red] {e}")
             raise typer.Exit(code=1)
 
+    # Render Terminal Output
     render_result(result)
+    
+    # Handle Export
+    if export_path:
+        export_to_json(result, export_path)
+        console.print(f"\n[dim]Report successfully exported to {export_path}[/dim]")
     
     if not result.passed:
         raise typer.Exit(code=1)

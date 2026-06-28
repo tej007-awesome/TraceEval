@@ -1,31 +1,33 @@
-# src/agentci/loaders/live.py
-"""Dynamic loader for live pipeline functions.
-
-This module uses ``importlib`` to load a user‑specified module and retrieve a callable
-named ``pipeline``. The callable is expected to accept a ``str`` query and return a
-string answer. This enables the CLI to evaluate arbitrary pipelines without hard‑coding
-them into the repository.
-"""
-
+import sys
 import importlib
-from types import ModuleType
-from typing import Callable
+from pathlib import Path
+from agentci.core.schema import EDDTestCase, AgentTrace
 
-def load_pipeline(module_path: str) -> Callable[[str], str]:
-    """Load a ``pipeline`` function from the given module path.
-
-    Args:
-        module_path: Dotted import path to the module, e.g. ``my_pkg.pipeline``.
-
-    Returns:
-        Callable that takes a query string and returns a result string.
-
-    Raises:
-        ImportError: If the module cannot be imported.
-        AttributeError: If the module does not define a ``pipeline`` callable.
+def run_live_pipeline(pipeline_path: str, case: EDDTestCase) -> AgentTrace:
     """
-    module: ModuleType = importlib.import_module(module_path)
-    pipeline = getattr(module, "pipeline", None)
-    if not callable(pipeline):
-        raise AttributeError(f"Module '{module_path}' does not define a callable 'pipeline'.")
-    return pipeline
+    Dynamically imports an agent function and runs it with the test case input.
+    Format expected: 'module.submodule:function_name'
+    """
+    # Ensure the current working directory is in the path so we can import local modules
+    sys.path.insert(0, str(Path.cwd()))
+    
+    if ":" not in pipeline_path:
+        raise ValueError("Pipeline path must be in 'module:function' format (e.g., examples.agent:run).")
+    
+    module_path, fn_name = pipeline_path.split(":", 1)
+    
+    try:
+        module = importlib.import_module(module_path)
+        agent_fn = getattr(module, fn_name)
+    except ImportError as e:
+        raise ImportError(f"Could not import module '{module_path}': {e}")
+    except AttributeError:
+        raise AttributeError(f"Function '{fn_name}' not found in module '{module_path}'.")
+    
+    # Execute the live agent
+    trace = agent_fn(case.input_prompt)
+    
+    if not isinstance(trace, AgentTrace):
+        raise TypeError(f"Pipeline must return an AgentTrace, got {type(trace)} instead.")
+        
+    return trace
