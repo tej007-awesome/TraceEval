@@ -14,7 +14,7 @@ _startup_console = Console()
 try:
     from agentci.core.config import settings  # noqa: F401
 except Exception as e:
-    _startup_console.print("\n[bold red]⚠️ Configuration Error:[/bold red]")
+    _startup_console.print("\n[bold red] Configuration Error:[/bold red]")
     _startup_console.print("Missing or invalid environment variables. Please check your [bold].env[/bold] file.")
     _startup_console.print(f"[dim]Details: {e}[/dim]\n")
     sys.exit(1)
