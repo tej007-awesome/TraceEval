@@ -1,3 +1,4 @@
+from __future__ import annotations
 from pydantic import BaseModel, Field
 from typing import List, Dict, Any, Optional
 from enum import Enum
@@ -8,6 +9,14 @@ class TrajectoryMode(str, Enum):
     IN_ORDER = "IN_ORDER"     
     ANY_ORDER = "ANY_ORDER"  
 
+class GoldenRecord(BaseModel):
+    meta_id: str
+    scenario_type: str
+    expected_passed: bool
+    expected_failure_reason: Optional[str] = None
+    case: EDDTestCase
+    trace: AgentTrace
+    
 class ToolCall(BaseModel):
     """Represents a single tool invocation (MCP or local)."""
     tool_name: str

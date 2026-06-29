@@ -1,0 +1,67 @@
+{
+  "meta_id": "golden_002_dow",
+  "scenario_type": "cost_exceeded",
+  "expected_passed": false,
+  "expected_failure_reason": "total_token_cost_usd exceeds max_cost",
+  "case": {
+    "case_id": "refund_001",
+    "input_prompt": "I was charged twice for order #4521. Please fix this.",
+    "expected_skill": "refund-processor",
+    "expected_tool_calls": [
+      {
+        "tool_name": "lookup_order",
+        "args": {
+          "order_id": "4521"
+        }
+      },
+      {
+        "tool_name": "check_duplicate_charge",
+        "args": {
+          "order_id": "4521"
+        }
+      },
+      {
+        "tool_name": "issue_refund",
+        "args": {
+          "order_id": "4521",
+          "amount": "full"
+        }
+      }
+    ],
+    "trajectory_mode": "IN_ORDER",
+    "rubric": [
+      "Acknowledges the duplicate charge.",
+      "Confirms the refund has been processed.",
+      "Maintains a polite, professional tone."
+    ]
+  },
+  "trace": {
+    "session_id": "sess_999",
+    "triggered_skills": [
+      "refund-processor"
+    ],
+    "executed_tools": [
+      {
+        "tool_name": "lookup_order",
+        "args": {
+          "order_id": "4521"
+        }
+      },
+      {
+        "tool_name": "check_duplicate_charge",
+        "args": {
+          "order_id": "4521"
+        }
+      },
+      {
+        "tool_name": "issue_refund",
+        "args": {
+          "order_id": "4521",
+          "amount": "full"
+        }
+      }
+    ],
+    "final_output": "I sincerely apologize for the inconvenience. I've verified that a duplicate charge occurred for order #4521. A full refund has been issued to your original payment method and should appear within 3-5 business days.",
+    "total_token_cost_usd": 5.5
+  }
+}
