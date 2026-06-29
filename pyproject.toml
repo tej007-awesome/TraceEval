@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "agentci"
+name = "agentci-eval"
 version = "0.1.0"
 description = "CI/CD and Evaluation Infrastructure for Autonomous Agents (Agentic Engineering)"
 authors = [
@@ -36,3 +36,6 @@ target-version = "py311"
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/agentci"]
