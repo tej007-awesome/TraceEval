@@ -1,6 +1,6 @@
 from pathlib import Path
-from agentci.core.schema import EDDTestCase, AgentTrace
-from agentci.core.logger import logger
+from traceeval.core.schema import EDDTestCase, AgentTrace
+from traceeval.core.logger import logger
 
 def load_test_case(file_path: Path) -> EDDTestCase:
     """Loads an EDD test case from a JSON file."""

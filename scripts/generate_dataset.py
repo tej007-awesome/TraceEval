@@ -1,6 +1,6 @@
 from pathlib import Path
-from agentci.loaders.file import load_test_case, load_trace
-from agentci.core.schema import GoldenRecord
+from traceeval.loaders.file import load_test_case, load_trace
+from traceeval.core.schema import GoldenRecord
 
 # 1. Setup paths
 OUTPUT_DIR = Path("test_suite")

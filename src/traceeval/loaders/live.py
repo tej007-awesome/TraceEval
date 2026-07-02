@@ -1,8 +1,8 @@
 import sys
 import importlib
 from pathlib import Path
-from agentci.core.schema import EDDTestCase, AgentTrace
-from agentci.core.logger import logger
+from traceeval.core.schema import EDDTestCase, AgentTrace
+from traceeval.core.logger import logger
 
 def run_live_pipeline(pipeline_path: str, case: EDDTestCase) -> AgentTrace:
     """

@@ -6,8 +6,8 @@ from rich.table import Table
 from pydantic import BaseModel
 from typing import Optional
 
-from agentci.core.schema import EDDTestCase, AgentTrace
-from agentci.metrics.trajectory_judge import run_evaluation
+from traceeval.core.schema import EDDTestCase, AgentTrace
+from traceeval.metrics.trajectory_judge import run_evaluation
 
 # Mute the middleware logger so our batch table prints cleanly
 logging.getLogger().setLevel(logging.ERROR)
@@ -64,7 +64,7 @@ async def main():
     falsely_blocked = 0
     falsely_passed = 0
 
-    table = Table(title="AgentCI Meta-Evaluation Results", show_lines=True)
+    table = Table(title="TraceEval Meta-Evaluation Results", show_lines=True)
     table.add_column("Scenario ID", style="cyan")
     table.add_column("Type", style="magenta")
     table.add_column("Expected", justify="center")

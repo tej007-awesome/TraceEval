@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "agentci-eval"
+name = "trace-eval-core"
 version = "0.1.0"
 description = "CI/CD and Evaluation Infrastructure for Autonomous Agents (Agentic Engineering)"
 authors = [
@@ -20,7 +20,7 @@ dependencies = [
 ]
 
 [project.scripts]
-agentci = "agentci.cli:app"
+traceeval = "traceeval.cli:app"
 
 [project.optional-dependencies]
 dev = [
@@ -38,4 +38,4 @@ asyncio_mode = "auto"
 testpaths = ["tests"]
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/agentci"]
+packages = ["src/traceeval"]

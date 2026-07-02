@@ -2,8 +2,8 @@
 """Tests for data loader utilities."""
 
 import pathlib
-from agentci.loaders.file import load_test_case, load_trace
-from agentci.core.schema import EDDTestCase, AgentTrace
+from traceeval.loaders.file import load_test_case, load_trace
+from traceeval.core.schema import EDDTestCase, AgentTrace
 
 
 def test_load_test_case(tmp_path: pathlib.Path):

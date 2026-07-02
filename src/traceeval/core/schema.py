@@ -58,7 +58,7 @@ class EvaluationDimensionScore(BaseModel):
     reasoning: str = Field(..., description="The judge's justification for the scores.")
 
 class EvaluationResult(BaseModel):
-    """The final output payload for AgentCI."""
+    """The final output payload for TraceEval."""
     case_id: str
     passed: bool
     scores: EvaluationDimensionScore

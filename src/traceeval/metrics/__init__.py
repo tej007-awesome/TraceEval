@@ -1,5 +1,5 @@
-# src/agentci/metrics/__init__.py
-"""Metrics subpackage for AgentCI.
+# src/traceeval/metrics/__init__.py
+"""Metrics subpackage for TraceEval.
 
 Provides evaluation metrics for LLM outputs, e.g., using ragas or trajectory judge.
 """

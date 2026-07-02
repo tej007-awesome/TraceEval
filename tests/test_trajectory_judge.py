@@ -4,14 +4,14 @@
 import pytest
 from unittest.mock import AsyncMock, patch, MagicMock
 
-from agentci.core.schema import (
+from traceeval.core.schema import (
     TrajectoryMode,
     ToolCall,
     EDDTestCase,
     AgentTrace,
     EvaluationDimensionScore,
 )
-from agentci.metrics.trajectory_judge import (
+from traceeval.metrics.trajectory_judge import (
     validate_trajectory,
     validate_system_constraints,
     evaluate_dimensions,
@@ -105,7 +105,7 @@ def test_validate_system_constraints():
     assert validate_system_constraints(trace_wrong_skill, case_no_skill) is True
 
 @pytest.mark.asyncio
-@patch("agentci.metrics.trajectory_judge.AsyncOpenAI")
+@patch("traceeval.metrics.trajectory_judge.AsyncOpenAI")
 async def test_evaluate_dimensions(mock_async_openai_class, monkeypatch):
     monkeypatch.setenv("OPENAI_API_KEY", "mock-key")
     # Setup mocks
@@ -151,7 +151,7 @@ async def test_evaluate_dimensions(mock_async_openai_class, monkeypatch):
     mock_client.chat.completions.create.assert_called_once()
 
 @pytest.mark.asyncio
-@patch("agentci.metrics.trajectory_judge.evaluate_dimensions")
+@patch("traceeval.metrics.trajectory_judge.evaluate_dimensions")
 async def test_run_evaluation(mock_eval_dimensions):
     mock_score = EvaluationDimensionScore(
         intent_satisfaction=0.9,

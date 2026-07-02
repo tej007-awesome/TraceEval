@@ -1,9 +1,9 @@
 from typing import List
 from openai import AsyncOpenAI
-from agentci.core.config import settings
-from agentci.core.logger import logger
+from traceeval.core.config import settings
+from traceeval.core.logger import logger
 
-from agentci.core.schema import (
+from traceeval.core.schema import (
     TrajectoryMode,
     ToolCall,
     EDDTestCase,

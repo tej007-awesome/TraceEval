@@ -3,16 +3,16 @@ import asyncio
 import typer
 from pathlib import Path
 from typing import Optional
-from agentci.loaders.file import load_test_case, load_trace
-from agentci.loaders.live import run_live_pipeline
-from agentci.metrics.trajectory_judge import run_evaluation
-from agentci.reporting.console import render_result, console
-from agentci.reporting.export import export_to_json
+from traceeval.loaders.file import load_test_case, load_trace
+from traceeval.loaders.live import run_live_pipeline
+from traceeval.metrics.trajectory_judge import run_evaluation
+from traceeval.reporting.console import render_result, console
+from traceeval.reporting.export import export_to_json
 
 from rich.console import Console
 _startup_console = Console()
 try:
-    from agentci.core.config import settings  # noqa: F401
+    from traceeval.core.config import settings  # noqa: F401
 except Exception as e:
     _startup_console.print("\n[bold red] Configuration Error:[/bold red]")
     _startup_console.print("Missing or invalid environment variables. Please check your [bold].env[/bold] file.")
@@ -21,8 +21,8 @@ except Exception as e:
 
 
 app = typer.Typer(
-    name="agentci",
-    help="AgentCI: CI/CD and Evaluation Infrastructure for Autonomous Agents",
+    name="traceeval",
+    help="TraceEval: CI/CD and Evaluation Infrastructure for Autonomous Agents",
     add_completion=False,
 )
 
@@ -31,10 +31,10 @@ def main(
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Enable verbose logging")
 ):
     """
-    AgentCI: The CI/CD gate for Agentic Engineering.
+    TraceEval: The CI/CD gate for Agentic Engineering.
     """
     if verbose:
-        from agentci.core.logger import set_verbose_mode
+        from traceeval.core.logger import set_verbose_mode
         set_verbose_mode()
 
 @app.command()
@@ -46,7 +46,7 @@ def run(
     max_cost: float = typer.Option(0.10, "--max-cost", help="Maximum allowable session budget in USD"),
     score_threshold: float = typer.Option(0.8, "--score-threshold", help="Minimum score threshold for intent/correctness"),
 ):
-    """Run an AgentCI evaluation against a static trace or a live agent pipeline."""
+    """Run a TraceEval evaluation against a static trace or a live agent pipeline."""
     import os
     if "OPENAI_API_KEY" not in os.environ and settings.llm_base_url is None:
         console.print("\n[bold red]Configuration Error:[/bold red]")

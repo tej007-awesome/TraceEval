@@ -1,8 +1,8 @@
-# src/agentci/reporting/console.py
+# src/traceeval/reporting/console.py
 from rich.console import Console
 from rich.table import Table
 from rich.panel import Panel
-from agentci.core.schema import EvaluationResult
+from traceeval.core.schema import EvaluationResult
 
 console = Console()
 

@@ -9,8 +9,8 @@ logging.basicConfig(
     handlers=[RichHandler(rich_tracebacks=True, show_path=False)]
 )
 
-# Create a custom logger for AgentCI
-logger = logging.getLogger("agentci")
+# Create a custom logger for TraceEval
+logger = logging.getLogger("traceeval")
 logger.setLevel(logging.WARNING)
 
 def set_verbose_mode():

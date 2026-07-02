@@ -1,5 +1,5 @@
 from pathlib import Path
-from agentci.core.schema import EvaluationResult
+from traceeval.core.schema import EvaluationResult
 
 def export_to_json(result: EvaluationResult, export_path: str) -> None:
     """Exports the EvaluationResult to a JSON file."""
