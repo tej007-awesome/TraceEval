@@ -3,24 +3,13 @@ import logging
 from pathlib import Path
 from rich.console import Console
 from rich.table import Table
-from pydantic import BaseModel
-from typing import Optional
 
-from traceeval.core.schema import EDDTestCase, AgentTrace
+from traceeval.core.schema import GoldenRecord
 from traceeval.metrics.trajectory_judge import run_evaluation
 
 # Mute the middleware logger so our batch table prints cleanly
 logging.getLogger().setLevel(logging.ERROR)
 console = Console()
-
-# Define the Golden Record wrapper schema
-class GoldenRecord(BaseModel):
-    meta_id: str
-    scenario_type: str
-    expected_passed: bool
-    expected_failure_reason: Optional[str] = None
-    case: EDDTestCase
-    trace: AgentTrace
 
 async def evaluate_with_semaphore(record: GoldenRecord, sem: asyncio.Semaphore):
     """Wraps the evaluation engine with a concurrency limiter."""
