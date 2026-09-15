@@ -2,6 +2,7 @@ import json
 from pathlib import Path
 import pytest
 
+from traceeval.core.schema import EDDTestCase, TrajectoryMode
 from traceeval.loaders.file import load_test_case
 from traceeval.loaders.otel import load_otel_trace
 from traceeval.metrics.trajectory_judge import validate_system_constraints, validate_trajectory
@@ -35,6 +36,14 @@ def test_load_otel_trace_happy_path():
         assert usage.model == "gpt-4o-mini"
         assert usage.input_tokens > 0
         assert usage.output_tokens > 0
+
+    total_input = sum(u.input_tokens for u in result.token_usage)
+    total_output = sum(u.output_tokens for u in result.token_usage)
+    expected_cost = (total_input / 1_000_000) * 0.15 + (total_output / 1_000_000) * 0.60
+
+    assert trace.total_token_cost_usd == expected_cost
+    assert trace.total_token_cost_usd > 0
+    assert trace.cost_complete is True
 
 
 def test_load_otel_trace_no_args_privacy():
@@ -115,3 +124,63 @@ def test_load_otel_trace_gate_1_validation():
         max_cost=0.10,
     )
     assert constraints_check.passed is True
+
+
+def test_load_otel_trace_unknown_model_fails_cost_check(tmp_path):
+    unknown_model_json = {
+        "resourceSpans": [
+            {
+                "scopeSpans": [
+                    {
+                        "spans": [
+                            {
+                                "traceId": "trace_id_3333333333333333333333",
+                                "name": "chat mystery-model",
+                                "startTimeUnixNano": "1000",
+                                "attributes": [
+                                    {
+                                        "key": "gen_ai.operation.name",
+                                        "value": {"stringValue": "chat"},
+                                    },
+                                    {
+                                        "key": "gen_ai.request.model",
+                                        "value": {"stringValue": "mystery-model"},
+                                    },
+                                    {
+                                        "key": "gen_ai.usage.input_tokens",
+                                        "value": {"intValue": "100"},
+                                    },
+                                    {
+                                        "key": "gen_ai.usage.output_tokens",
+                                        "value": {"intValue": "50"},
+                                    },
+                                ],
+                            }
+                        ]
+                    }
+                ]
+            }
+        ]
+    }
+    file_path = tmp_path / "unknown_model.json"
+    file_path.write_text(json.dumps(unknown_model_json))
+
+    result = load_otel_trace(file_path)
+
+    assert result.trace.cost_complete is False
+    assert "no pricing for model(s) [mystery-model]; cost is incomplete" in result.warnings
+
+    case = EDDTestCase(
+        case_id="case_unknown_model",
+        input_prompt="Test prompt",
+        expected_skill=None,
+        expected_tool_calls=[],
+        trajectory_mode=TrajectoryMode.IN_ORDER,
+        rubric=["polite"],
+    )
+    constraints_check = validate_system_constraints(trace=result.trace, case=case)
+    assert constraints_check.passed is False
+    assert (
+        "cost could not be verified: pricing missing for one or more models"
+        in constraints_check.reasons
+    )

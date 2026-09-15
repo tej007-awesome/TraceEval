@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 
 from traceeval.core.logger import logger
 from traceeval.core.schema import AgentTrace, ToolCall
+from traceeval.pricing import DEFAULT_PRICING, ModelPrice, compute_cost
 import traceeval.loaders.otel_attributes as otel_attrs
 
 
@@ -92,7 +93,9 @@ def _extract_text_content(val: Any) -> str:
     return str(val) if val is not None else ""
 
 
-def load_otel_trace(file_path: Path) -> OtelLoadResult:
+def load_otel_trace(
+    file_path: Path, pricing: Dict[str, ModelPrice] = DEFAULT_PRICING
+) -> OtelLoadResult:
     """Load and parse an OpenTelemetry trace JSON file following GenAI semantic conventions."""
     if not file_path.exists():
         raise FileNotFoundError(f"OTel trace file not found: {file_path}")
@@ -194,12 +197,19 @@ def load_otel_trace(file_path: Path) -> OtelLoadResult:
         final_output = ""
         warnings.append("final output not captured in trace")
 
+    cost_result = compute_cost(token_usage, pricing)
+    cost_complete = not cost_result.unknown_models
+    if not cost_complete:
+        models_str = ", ".join(cost_result.unknown_models)
+        warnings.append(f"no pricing for model(s) [{models_str}]; cost is incomplete")
+
     trace_model = AgentTrace(
         session_id=session_id,
         triggered_skills=triggered_skills,
         executed_tools=executed_tools,
         final_output=final_output,
-        total_token_cost_usd=0.0,
+        total_token_cost_usd=cost_result.total_usd,
+        cost_complete=cost_complete,
     )
 
     return OtelLoadResult(trace=trace_model, token_usage=token_usage, warnings=warnings)
