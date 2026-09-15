@@ -5,9 +5,14 @@ from enum import Enum
 
 class TrajectoryMode(str, Enum):
     """How strict the agent's tool execution path must be evaluated."""
-    EXACT = "EXACT"           
-    IN_ORDER = "IN_ORDER"     
-    ANY_ORDER = "ANY_ORDER"  
+    EXACT = "EXACT"
+    IN_ORDER = "IN_ORDER"
+    ANY_ORDER = "ANY_ORDER"
+
+class CheckResult(BaseModel):
+    """Outcome of a single deterministic gate, with human-readable reasons on failure."""
+    passed: bool
+    reasons: List[str] = []
 
 class GoldenRecord(BaseModel):
     meta_id: str
@@ -63,3 +68,4 @@ class EvaluationResult(BaseModel):
     passed: bool
     scores: EvaluationDimensionScore
     trace_summary: AgentTrace
+    failures: List[str] = []

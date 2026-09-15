@@ -1,79 +1,130 @@
 from typing import List
+
 from openai import AsyncOpenAI
+
 from traceeval.core.config import settings
 from traceeval.core.logger import logger
-
 from traceeval.core.schema import (
-    TrajectoryMode,
-    ToolCall,
-    EDDTestCase,
     AgentTrace,
+    CheckResult,
+    EDDTestCase,
     EvaluationDimensionScore,
     EvaluationResult,
+    ToolCall,
+    TrajectoryMode,
 )
+
+
+def _fmt_tool(tc: ToolCall) -> str:
+    args_str = ", ".join(f"{k}={v!r}" for k, v in tc.args.items())
+    return f"{tc.tool_name}({args_str})"
+
 
 def validate_trajectory(
     expected: List[ToolCall],
     actual: List[ToolCall],
     mode: TrajectoryMode,
-) -> bool:
-    """Validate actual tool calls against expected tool calls."""
+) -> CheckResult:
     logger.info(f"Starting deterministic trajectory validation (Mode: {mode.value})...")
     logger.debug(f"Expected tool calls count: {len(expected)}, Actual: {len(actual)}")
-    
+
     if mode == TrajectoryMode.EXACT:
         if len(expected) != len(actual):
-            return False
-        return all(e == a for e, a in zip(expected, actual))
+            return CheckResult(
+                passed=False,
+                reasons=[f"expected {len(expected)} tool calls, got {len(actual)}"],
+            )
+        reasons = [
+            f"step {i}: expected {_fmt_tool(e)}, got {_fmt_tool(a)}"
+            for i, (e, a) in enumerate(zip(expected, actual))
+            if e != a
+        ]
+        return CheckResult(passed=not reasons, reasons=reasons)
 
     elif mode == TrajectoryMode.IN_ORDER:
         expected_idx = 0
         for tool in actual:
             if expected_idx < len(expected) and tool == expected[expected_idx]:
                 expected_idx += 1
-        return expected_idx == len(expected)
+        reasons = []
+        for rank, i in enumerate(range(expected_idx, len(expected))):
+            exp_tool = expected[i]
+            present_anywhere = exp_tool in actual
+            if rank == 0:
+                # First unmatched: always report; distinguish absent vs wrong order.
+                if present_anywhere:
+                    reasons.append(
+                        f"expected {_fmt_tool(exp_tool)} at position {i} was called out of order"
+                    )
+                else:
+                    reasons.append(
+                        f"expected {_fmt_tool(exp_tool)} at position {i} was never called"
+                    )
+            elif not present_anywhere:
+                # Later unmatched: only report when genuinely absent from the trace.
+                reasons.append(
+                    f"expected {_fmt_tool(exp_tool)} at position {i} was never called"
+                )
+        return CheckResult(passed=not reasons, reasons=reasons)
 
     elif mode == TrajectoryMode.ANY_ORDER:
         actual_copy = list(actual)
+        reasons = []
         for exp_tool in expected:
             if exp_tool in actual_copy:
                 actual_copy.remove(exp_tool)
             else:
-                return False
-        return True
+                reasons.append(f"expected call {_fmt_tool(exp_tool)} not found in trace")
+        return CheckResult(passed=not reasons, reasons=reasons)
 
-    return False
+    return CheckResult(passed=False, reasons=["unknown trajectory mode"])
+
 
 def validate_system_constraints(
     trace: AgentTrace,
     case: EDDTestCase,
     max_cost: float = 0.10,
-) -> bool:
-    """Validate system constraints like cost budget and required skills."""
-    logger.info(f"Checking system constraints (Max Cost budget: ${max_cost:.4f}, Actual Cost: ${trace.total_token_cost_usd:.4f})...")
+) -> CheckResult:
+    logger.info(
+        f"Checking system constraints (Max Cost budget: ${max_cost:.4f}, "
+        f"Actual Cost: ${trace.total_token_cost_usd:.4f})..."
+    )
+    reasons = []
+
     if trace.total_token_cost_usd > max_cost:
-        logger.warning(f"Constraint Failed: Total token cost (${trace.total_token_cost_usd:.4f}) exceeds budget (${max_cost:.4f})")
-        return False
+        reasons.append(
+            f"cost ${trace.total_token_cost_usd:.4f} exceeds budget ${max_cost:.4f}"
+        )
+
     if case.expected_skill is not None and case.expected_skill not in trace.triggered_skills:
-        logger.warning(f"Constraint Failed: Expected skill '{case.expected_skill}' was not triggered (Triggered: {trace.triggered_skills})")
-        return False
-    logger.info("System constraints checks PASSED.")
-    return True
+        triggered = ", ".join(trace.triggered_skills) if trace.triggered_skills else "none"
+        reasons.append(
+            f"expected skill '{case.expected_skill}' not triggered (triggered: [{triggered}])"
+        )
+
+    if reasons:
+        for r in reasons:
+            logger.warning(f"Constraint Failed: {r}")
+    else:
+        logger.info("System constraints checks PASSED.")
+
+    return CheckResult(passed=not reasons, reasons=reasons)
+
 
 async def evaluate_dimensions(
     trace: AgentTrace,
     case: EDDTestCase,
 ) -> EvaluationDimensionScore:
     """Use an OpenAI-compatible endpoint to evaluate the semantic quality of the agent's response."""
-    client = AsyncOpenAI() 
-    
+    client = AsyncOpenAI()
+
     rubric_str = "\n".join(f"- {item}" for item in case.rubric)
-    
+
     tools_str = "\n".join(f"- {t.tool_name}: {t.args}" for t in trace.executed_tools)
     if not tools_str:
         tools_str = "No tools executed."
-        
-    prompt = f"""You are an expert AI trajectory and response judge. 
+
+    prompt = f"""You are an expert AI trajectory and response judge.
 Your task is to evaluate the quality of the agent execution trace against the given input prompt and the rubric criteria.
 
 Input Prompt:
@@ -106,12 +157,12 @@ Return your evaluation as a valid JSON object with EXACTLY these keys:
         model=settings.llm_model_name,
         messages=[
             {"role": "system", "content": "You are a strict JSON-only evaluation judge. Output only valid JSON."},
-            {"role": "user", "content": prompt}
+            {"role": "user", "content": prompt},
         ],
         response_format={"type": "json_object"},
         temperature=0.0,
     )
-    
+
     if not response.choices:
         raise ValueError(
             f"Judge LLM returned no response (possibly rate-limited). "
@@ -140,41 +191,44 @@ async def run_evaluation(
 ) -> EvaluationResult:
     """Run full evaluation suite for a vibe coding test case."""
     logger.info(f"Starting evaluation for case: {case.case_id}")
-    
-    # Step 1: Trajectory Validation
-    trajectory_ok = validate_trajectory(
+
+    trajectory_check = validate_trajectory(
         expected=case.expected_tool_calls,
         actual=trace.executed_tools,
         mode=case.trajectory_mode,
     )
-    
-    # Step 2: System Constraints Validation
-    constraints_ok = validate_system_constraints(
+
+    constraints_check = validate_system_constraints(
         trace=trace,
         case=case,
         max_cost=max_cost,
     )
-    
-    passed = trajectory_ok and constraints_ok
 
-    # Step 3: SHORT-CIRCUIT if deterministic checks fail!
+    failures = trajectory_check.reasons + constraints_check.reasons
+    passed = trajectory_check.passed and constraints_check.passed
+
     if not passed:
         logger.warning("Deterministic constraints failed. Short-circuiting LLM evaluation.")
         empty_scores = EvaluationDimensionScore(
-            intent_satisfaction=0.0, functional_correctness=0.0,
-            trajectory_quality=0.0, cost_efficiency=0.0, safety_and_rai=0.0,
-            reasoning="DETERMINISTIC FAILURE: Trajectory or Cost constraints violated. LLM evaluation skipped."
+            intent_satisfaction=0.0,
+            functional_correctness=0.0,
+            trajectory_quality=0.0,
+            cost_efficiency=0.0,
+            safety_and_rai=0.0,
+            reasoning="DETERMINISTIC FAILURE: Trajectory or cost constraints violated. LLM evaluation skipped.",
         )
         return EvaluationResult(
-            case_id=case.case_id, passed=False,
-            scores=empty_scores, trace_summary=trace,
+            case_id=case.case_id,
+            passed=False,
+            scores=empty_scores,
+            trace_summary=trace,
+            failures=failures,
         )
-        
-    # Step 4: Semantic Evaluation (Only runs if structurally sound)
+
     logger.info(f"Deterministic checks passed. Triggering semantic evaluation via {settings.llm_model_name}...")
     scores = await evaluate_dimensions(trace=trace, case=case)
     logger.info("Semantic evaluation completed.")
-    
+
     dimensions_to_check = {
         "Intent Satisfaction": scores.intent_satisfaction,
         "Functional Correctness": scores.functional_correctness,
@@ -187,8 +241,12 @@ async def run_evaluation(
         if score is not None and score < score_threshold:
             logger.warning(f"Semantic Gate Failed: {dim_name} score ({score}) is below threshold ({score_threshold})")
             passed = False
+            failures.append(f"{dim_name}: {score} < {score_threshold}")
 
     return EvaluationResult(
-        case_id=case.case_id, passed=passed,
-        scores=scores, trace_summary=trace,
+        case_id=case.case_id,
+        passed=passed,
+        scores=scores,
+        trace_summary=trace,
+        failures=failures,
     )
