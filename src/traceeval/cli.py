@@ -45,7 +45,7 @@ def run(
     pipeline: Optional[str] = typer.Option(None, "--pipeline", "-p", help="Live agent function (e.g. 'examples.reference_agent:process_refund')"),
     export_path: Optional[str] = typer.Option(None, "--export", "-e", help="Path to save the JSON EvaluationResult"),
     max_cost: float = typer.Option(0.10, "--max-cost", help="Maximum allowable session budget in USD"),
-    score_threshold: float = typer.Option(0.8, "--score-threshold", help="Minimum score threshold for intent/correctness"),
+    score_threshold: float = typer.Option(0.8, "--score-threshold", help="Minimum score (0-1) that every non-null judge dimension must meet"),
 ):
     """Run a TraceEval evaluation against a static trace or a live agent pipeline."""
     has_api_key = bool(settings.llm_api_key or os.environ.get("OPENAI_API_KEY"))
