@@ -112,11 +112,19 @@ Return your evaluation as a valid JSON object with EXACTLY these keys:
         temperature=0.0,
     )
     
+    if not response.choices:
+        raise ValueError(
+            f"Judge LLM returned no response (possibly rate-limited). "
+            f"Model: {settings.llm_model_name}. Try again or use a different model."
+        )
+
     raw_content = response.choices[0].message.content
 
-
     if not raw_content:
-        raise ValueError("LLM returned empty content. Could not evaluate dimensions.")
+        raise ValueError(
+            f"Judge LLM returned empty content. "
+            f"Model: {settings.llm_model_name}. Try again or use a different model."
+        )
 
     try:
         return EvaluationDimensionScore.model_validate_json(raw_content)

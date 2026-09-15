@@ -151,6 +151,53 @@ async def test_evaluate_dimensions(mock_async_openai_class, monkeypatch):
     mock_client.chat.completions.create.assert_called_once()
 
 @pytest.mark.asyncio
+@patch("traceeval.metrics.trajectory_judge.AsyncOpenAI")
+async def test_evaluate_dimensions_empty_response(mock_async_openai_class, monkeypatch):
+    monkeypatch.setenv("OPENAI_API_KEY", "mock-key")
+    mock_client = MagicMock()
+    mock_async_openai_class.return_value = mock_client
+
+    case = EDDTestCase(
+        case_id="case_empty",
+        input_prompt="Prompt",
+        expected_skill=None,
+        expected_tool_calls=[],
+        trajectory_mode=TrajectoryMode.IN_ORDER,
+        rubric=["check 1"],
+    )
+    trace = AgentTrace(
+        session_id="session_empty",
+        triggered_skills=[],
+        executed_tools=[],
+        final_output="Output",
+        total_token_cost_usd=0.01,
+    )
+
+    # choices = None
+    mock_response_none = MagicMock()
+    mock_response_none.choices = None
+    mock_client.chat.completions.create = AsyncMock(return_value=mock_response_none)
+    with pytest.raises(ValueError, match="no response"):
+        await evaluate_dimensions(trace, case)
+
+    # choices = []
+    mock_response_empty = MagicMock()
+    mock_response_empty.choices = []
+    mock_client.chat.completions.create = AsyncMock(return_value=mock_response_empty)
+    with pytest.raises(ValueError, match="no response"):
+        await evaluate_dimensions(trace, case)
+
+    # choices present but content is empty string
+    mock_response_no_content = MagicMock()
+    mock_choice = MagicMock()
+    mock_choice.message.content = ""
+    mock_response_no_content.choices = [mock_choice]
+    mock_client.chat.completions.create = AsyncMock(return_value=mock_response_no_content)
+    with pytest.raises(ValueError, match="empty content"):
+        await evaluate_dimensions(trace, case)
+
+
+@pytest.mark.asyncio
 @patch("traceeval.metrics.trajectory_judge.evaluate_dimensions")
 async def test_run_evaluation(mock_eval_dimensions):
     mock_score = EvaluationDimensionScore(
