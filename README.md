@@ -13,11 +13,11 @@ In 2024, developers worried about what AI would *say*. In 2026, enterprises worr
 When agents possess ambient agency to execute code and access APIs, testing just the final output is dangerous. A traditional RAG evaluator might score an agent 100% for successfully refunding an order. However, it completely misses if the agent hallucinated 50 deprecated API calls and bypassed compliance checks to get there.
 
 ## The Solution: Evaluation-Driven Development (EDD)
-TraceEval shifts the industry to **Evaluation-Driven Development**. Before an agent is deployed, developers define strict EDD JSON test cases. TraceEval then audits the agent's OpenTelemetry trace (the "Vibe Trajectory") against these criteria.
+TraceEval shifts the industry to **Evaluation-Driven Development**. Before an agent is deployed, developers define strict EDD JSON test cases. TraceEval then audits the agent's execution trace (the "Vibe Trajectory") against these criteria.
 
 ### Core Features
 - **Trajectory Validation:** Enforce strict tool execution sequences (`EXACT`, `IN_ORDER`, `ANY_ORDER`) before evaluating semantic quality.
-- **Cost Circuit Breakers:** Track `total_token_cost_usd` per session to automatically block deployments that exhibit "Denial of Wallet" (DoW) infinite-loop behaviors.
+- **Post-Run Budget Gate:** After each evaluation run, TraceEval checks `total_token_cost_usd` against a configurable ceiling and blocks deployment if the session exceeded it — preventing "Denial of Wallet" (DoW) infinite-loop behaviors from reaching production.
 - **Provider-Agnostic LLM-Judge:** Bring Your Own Judge (BYOJ). Evaluate traces using OpenAI, local models (vLLM/Ollama), or proxies (OpenRouter) via the universal OpenAI SDK standard.
 - **Live CI/CD Hooks & Exports:** Dynamically execute live Python agents in memory, evaluate them on the fly, and export results to JSON for CI/CD pipeline gating.
 - **Middleware Observability:** Zero-performance-impact logging. Run with `--verbose` to inspect ingestion boundaries and judge latency.
@@ -113,14 +113,15 @@ TraceEval decouples the **Ingestion Layer** from the **Evaluation Engine** using
 
 ---
 
-## Vision & What's Next (V1)
+## Roadmap
 
-We have successfully shipped **v0** (Core EDD Schema, Trajectory Validator, BYOJ Engine, Live Pipeline Hook). To track the granular V1 roadmap, please see our [GitHub Issues](https://github.com/tej007-awesome/TraceEval/issues).
+v0 ships the core EDD Schema, Trajectory Validator, BYOJ Engine, and Live Pipeline Hook. Planned for v1:
 
-Upcoming architectural milestones include:
-- **Universal OpenTelemetry Adapters:** Abstracting the Ingestion layer so TraceEval can seamlessly evaluate traces from LangGraph, OpenAI Swarm, Claude SDK, or raw MCP servers.
-- **Automated Green Teaming:** Automatically auto-refactoring failing `SKILL.md` files if a trajectory triggers a security violation.
-- **Prefect Orchestration:** Distributed CI/CD scheduling for high-volume enterprise workloads.
+- **OpenTelemetry trace ingestion:** Adapters to ingest native OTel spans from LangGraph, OpenAI Swarm, Claude SDK, and raw MCP servers — so you can point TraceEval at real production traces without converting them by hand.
+- **Live budget guard:** Real-time token-cost interception during agent execution, not just post-run checking.
+- **Offline mock judge mode:** Deterministic stub judge for CI pipelines that cannot call an external LLM (air-gapped environments, cost-sensitive PR checks).
+
+To track granular progress, see our [GitHub Issues](https://github.com/tej007-awesome/TraceEval/issues).
 
 ---
 
