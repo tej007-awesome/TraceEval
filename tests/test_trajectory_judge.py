@@ -424,3 +424,70 @@ async def test_run_evaluation(mock_eval_dimensions):
     assert "Intent Satisfaction" in res.failures[0]
     assert "0.5" in res.failures[0]
     assert "0.7" in res.failures[0]
+
+
+@pytest.mark.asyncio
+@patch("traceeval.metrics.trajectory_judge.evaluate_dimensions")
+async def test_run_evaluation_null_dimensions(mock_eval_dimensions):
+    case = EDDTestCase(
+        case_id="null_case",
+        input_prompt="Prompt",
+        expected_skill="svc",
+        expected_tool_calls=[tool_a],
+        trajectory_mode=TrajectoryMode.IN_ORDER,
+        rubric=["rubric 1"],
+    )
+    trace = AgentTrace(
+        session_id="s1",
+        triggered_skills=["svc"],
+        executed_tools=[tool_a],
+        final_output="Output",
+        total_token_cost_usd=0.01,
+    )
+
+    # All five null → fails with exactly 3 reasons (one per required dimension)
+    mock_eval_dimensions.return_value = EvaluationDimensionScore(
+        intent_satisfaction=None,
+        functional_correctness=None,
+        trajectory_quality=None,
+        cost_efficiency=None,
+        safety_and_rai=None,
+        reasoning="Unable to score",
+    )
+    res = await run_evaluation(case, trace)
+    assert res.passed is False
+    assert len(res.failures) == 3
+    assert any("intent_satisfaction" in f for f in res.failures)
+    assert any("functional_correctness" in f for f in res.failures)
+    assert any("safety_and_rai" in f for f in res.failures)
+    # optional dims must NOT produce failures
+    assert not any("trajectory_quality" in f for f in res.failures)
+    assert not any("cost_efficiency" in f for f in res.failures)
+
+    # Only cost_efficiency null, all required dims scored above threshold → passes
+    mock_eval_dimensions.return_value = EvaluationDimensionScore(
+        intent_satisfaction=0.9,
+        functional_correctness=0.9,
+        trajectory_quality=0.9,
+        cost_efficiency=None,
+        safety_and_rai=0.9,
+        reasoning="OK",
+    )
+    res = await run_evaluation(case, trace)
+    assert res.passed is True
+    assert res.failures == []
+
+    # safety_and_rai null, all others above threshold → fails with exactly one reason
+    mock_eval_dimensions.return_value = EvaluationDimensionScore(
+        intent_satisfaction=0.9,
+        functional_correctness=0.9,
+        trajectory_quality=0.9,
+        cost_efficiency=0.9,
+        safety_and_rai=None,
+        reasoning="Safety unclear",
+    )
+    res = await run_evaluation(case, trace)
+    assert res.passed is False
+    assert len(res.failures) == 1
+    assert "safety_and_rai" in res.failures[0]
+    assert "null" in res.failures[0]

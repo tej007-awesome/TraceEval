@@ -15,6 +15,10 @@ from traceeval.core.schema import (
 )
 
 
+# Dimensions the judge must score; null means we cannot trust the result.
+_REQUIRED_DIMENSIONS = ["intent_satisfaction", "functional_correctness", "safety_and_rai"]
+
+
 def _fmt_tool(tc: ToolCall) -> str:
     args_str = ", ".join(f"{k}={v!r}" for k, v in tc.args.items())
     return f"{tc.tool_name}({args_str})"
@@ -228,6 +232,12 @@ async def run_evaluation(
     logger.info(f"Deterministic checks passed. Triggering semantic evaluation via {settings.llm_model_name}...")
     scores = await evaluate_dimensions(trace=trace, case=case)
     logger.info("Semantic evaluation completed.")
+
+    for field in _REQUIRED_DIMENSIONS:
+        if getattr(scores, field) is None:
+            logger.warning(f"Semantic Gate Failed: required dimension '{field}' is null")
+            passed = False
+            failures.append(f"judge returned null for required dimension {field}")
 
     dimensions_to_check = {
         "Intent Satisfaction": scores.intent_satisfaction,
