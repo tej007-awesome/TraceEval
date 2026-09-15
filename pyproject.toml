@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "traceeval"
+name = "traceeval-cli"
 version = "0.1.0"
 description = "CI/CD and Evaluation Infrastructure for Autonomous Agents (Agentic Engineering)"
 authors = [

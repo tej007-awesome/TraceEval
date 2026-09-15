@@ -30,8 +30,9 @@ TraceEval shifts the industry to **Evaluation-Driven Development**. Before an ag
 
 **For End-Users & CI/CD Pipelines:**
 ```bash
-pip install traceeval
+pip install traceeval-cli
 ```
+*(Note: The CLI command (`traceeval`) and Python package import (`import traceeval`) remain `traceeval`.)*
 
 **For Contributors:**
 ```bash
