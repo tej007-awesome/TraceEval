@@ -52,6 +52,7 @@ class AgentTrace(BaseModel):
     executed_tools: List[ToolCall]
     final_output: str
     total_token_cost_usd: float = Field(ge=0.0)
+    cost_complete: bool = True
 
 class EvaluationDimensionScore(BaseModel):
     """Scores mapped directly to the 5 dimensions of Vibe Coding Evaluation."""

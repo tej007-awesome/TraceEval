@@ -70,6 +70,11 @@ Perfect for pre-deployment CI/CD gating. Dynamically spawns your agent, captures
 ```bash
 traceeval run --case sample_data/case_01.json --pipeline examples.reference_agent:process_refund_success --export report.json
 ```
+**Mode C: Evaluate an OpenTelemetry (OTel) Trace**
+Audit OpenTelemetry traces adhering to GenAI semantic conventions.
+```bash
+traceeval run --case sample_data/case_01.json --otel-trace tests/fixtures/otel/refund_happy.json
+```
 
 *(Tip: Add `--verbose` right after `traceeval` to view detailed middleware logs!)*
 
@@ -114,13 +119,46 @@ TraceEval decouples the **Ingestion Layer** from the **Evaluation Engine** using
 
 ---
 
+## Evaluating OpenTelemetry Traces
+
+TraceEval natively ingests OpenTelemetry (OTel) JSON traces adhering to the **OTel GenAI Semantic Conventions**.
+
+```bash
+traceeval run --case sample_data/case_01.json --otel-trace tests/fixtures/otel/refund_happy.json
+```
+
+### Attributes Ingested
+TraceEval inspects the following GenAI span attributes:
+- `gen_ai.operation.name`: Identifies span types (`invoke_agent`, `chat`, `execute_tool`).
+- `gen_ai.agent.name` & `gen_ai.conversation.id`: Extracts agent skills and session metadata.
+- `gen_ai.request.model`, `gen_ai.usage.input_tokens`, `gen_ai.usage.output_tokens`: Tracks per-model token consumption.
+- `gen_ai.tool.name` & `gen_ai.tool.call.arguments`: Maps tool trajectories and parameters.
+- `gen_ai.output.messages`: Captures the agent's final text response.
+
+### Cost Computation & Custom Pricing
+Session token costs are automatically computed by matching `gen_ai.request.model` and token counts against model pricing rates. If pricing is missing for an unknown model, the cost check fails (`"cost could not be verified"`) to prevent unmonitored financial risk.
+
+You can supply custom pricing via `--pricing my_pricing.json`:
+```json
+{
+  "my-custom-model": {
+    "input_usd_per_1k": 0.00015,
+    "output_usd_per_1k": 0.0006
+  }
+}
+```
+
+> **Privacy Note:** Standard OTel instrumentation often redacts `gen_ai.tool.call.arguments` and `gen_ai.output.messages` to comply with privacy policies. When arguments are omitted, TraceEval outputs non-blocking warnings, and argument matching defaults to `{}`.
+
+---
+
 ## Roadmap
 
-v0 ships the core EDD Schema, Trajectory Validator, BYOJ Engine, and Live Pipeline Hook. Planned for v1:
+v0.2 adds OpenTelemetry GenAI trace ingestion with computed cost and specific failure reasons. Planned next:
 
-- **OpenTelemetry trace ingestion:** Adapters to ingest native OTel spans from LangGraph, OpenAI Swarm, Claude SDK, and raw MCP servers — so you can point TraceEval at real production traces without converting them by hand.
-- **Live budget guard:** Real-time token-cost interception during agent execution, not just post-run checking.
-- **Offline mock judge mode:** Deterministic stub judge for CI pipelines that cannot call an external LLM (air-gapped environments, cost-sensitive PR checks).
+- **Flexible argument matching and forbidden tools:** match tool arguments exactly, partially, or not at all (for privacy-redacted traces), and fail any trajectory that calls a denied tool.
+- **More reliable LLM judge:** per-rubric-item verdicts, multiple samples, retries, and an offline mock judge for CI pipelines that can't call an external LLM.
+- **Meta-evaluation benchmark:** a labelled set of good and bad traces that measures how accurately TraceEval itself catches failures.
 
 To track granular progress, see our [GitHub Issues](https://github.com/tej007-awesome/TraceEval/issues).
 

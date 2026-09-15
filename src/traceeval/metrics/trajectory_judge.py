@@ -93,6 +93,9 @@ def validate_system_constraints(
     )
     reasons = []
 
+    if not trace.cost_complete:
+        reasons.append("cost could not be verified: pricing missing for one or more models")
+
     if trace.total_token_cost_usd > max_cost:
         reasons.append(
             f"cost ${trace.total_token_cost_usd:.4f} exceeds budget ${max_cost:.4f}"

@@ -1,0 +1,344 @@
+{
+  "resourceSpans": [
+    {
+      "resource": {
+        "attributes": [
+          {
+            "key": "telemetry.sdk.language",
+            "value": {
+              "stringValue": "python"
+            }
+          },
+          {
+            "key": "telemetry.sdk.name",
+            "value": {
+              "stringValue": "opentelemetry"
+            }
+          },
+          {
+            "key": "telemetry.sdk.version",
+            "value": {
+              "stringValue": "1.44.0"
+            }
+          },
+          {
+            "key": "service.instance.id",
+            "value": {
+              "stringValue": "a20cc9e7-dfe8-48e4-9381-3a0935e86d77"
+            }
+          },
+          {
+            "key": "service.name",
+            "value": {
+              "stringValue": "unknown_service"
+            }
+          }
+        ]
+      },
+      "scopeSpans": [
+        {
+          "scope": {
+            "name": "traceeval.reference_agent"
+          },
+          "spans": [
+            {
+              "traceId": "22R4u5dEPMTesWofSrG9Gw==",
+              "spanId": "wmKDNgFsfFE=",
+              "name": "invoke_agent refund-processor",
+              "kind": "SPAN_KIND_INTERNAL",
+              "startTimeUnixNano": "1789461651116286000",
+              "endTimeUnixNano": "1789461651136615000",
+              "attributes": [
+                {
+                  "key": "gen_ai.operation.name",
+                  "value": {
+                    "stringValue": "invoke_agent"
+                  }
+                },
+                {
+                  "key": "gen_ai.agent.name",
+                  "value": {
+                    "stringValue": "refund-processor"
+                  }
+                },
+                {
+                  "key": "gen_ai.conversation.id",
+                  "value": {
+                    "stringValue": "sess_otel_001"
+                  }
+                }
+              ],
+              "status": {},
+              "flags": 256
+            },
+            {
+              "traceId": "22R4u5dEPMTesWofSrG9Gw==",
+              "spanId": "m0USnfxgSmg=",
+              "parentSpanId": "wmKDNgFsfFE=",
+              "name": "chat gpt-4o-mini",
+              "kind": "SPAN_KIND_INTERNAL",
+              "startTimeUnixNano": "1789461651118892000",
+              "endTimeUnixNano": "1789461651121443000",
+              "attributes": [
+                {
+                  "key": "gen_ai.operation.name",
+                  "value": {
+                    "stringValue": "chat"
+                  }
+                },
+                {
+                  "key": "gen_ai.request.model",
+                  "value": {
+                    "stringValue": "gpt-4o-mini"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.input_tokens",
+                  "value": {
+                    "intValue": "150"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.output_tokens",
+                  "value": {
+                    "intValue": "30"
+                  }
+                }
+              ],
+              "status": {},
+              "flags": 256
+            },
+            {
+              "traceId": "22R4u5dEPMTesWofSrG9Gw==",
+              "spanId": "6EJoQ7iSAQU=",
+              "parentSpanId": "wmKDNgFsfFE=",
+              "name": "execute_tool lookup_order",
+              "kind": "SPAN_KIND_INTERNAL",
+              "startTimeUnixNano": "1789461651121509000",
+              "endTimeUnixNano": "1789461651123569000",
+              "attributes": [
+                {
+                  "key": "gen_ai.operation.name",
+                  "value": {
+                    "stringValue": "execute_tool"
+                  }
+                },
+                {
+                  "key": "gen_ai.tool.name",
+                  "value": {
+                    "stringValue": "lookup_order"
+                  }
+                },
+                {
+                  "key": "gen_ai.tool.call.id",
+                  "value": {
+                    "stringValue": "call_lookup_001"
+                  }
+                },
+                {
+                  "key": "gen_ai.tool.call.arguments",
+                  "value": {
+                    "stringValue": "{\"order_id\": \"4521\"}"
+                  }
+                }
+              ],
+              "status": {},
+              "flags": 256
+            },
+            {
+              "traceId": "22R4u5dEPMTesWofSrG9Gw==",
+              "spanId": "bccnOB3vYEI=",
+              "parentSpanId": "wmKDNgFsfFE=",
+              "name": "chat gpt-4o-mini",
+              "kind": "SPAN_KIND_INTERNAL",
+              "startTimeUnixNano": "1789461651123654000",
+              "endTimeUnixNano": "1789461651126182000",
+              "attributes": [
+                {
+                  "key": "gen_ai.operation.name",
+                  "value": {
+                    "stringValue": "chat"
+                  }
+                },
+                {
+                  "key": "gen_ai.request.model",
+                  "value": {
+                    "stringValue": "gpt-4o-mini"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.input_tokens",
+                  "value": {
+                    "intValue": "220"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.output_tokens",
+                  "value": {
+                    "intValue": "35"
+                  }
+                }
+              ],
+              "status": {},
+              "flags": 256
+            },
+            {
+              "traceId": "22R4u5dEPMTesWofSrG9Gw==",
+              "spanId": "kRUdkouVsPM=",
+              "parentSpanId": "wmKDNgFsfFE=",
+              "name": "execute_tool check_duplicate_charge",
+              "kind": "SPAN_KIND_INTERNAL",
+              "startTimeUnixNano": "1789461651126241000",
+              "endTimeUnixNano": "1789461651128784000",
+              "attributes": [
+                {
+                  "key": "gen_ai.operation.name",
+                  "value": {
+                    "stringValue": "execute_tool"
+                  }
+                },
+                {
+                  "key": "gen_ai.tool.name",
+                  "value": {
+                    "stringValue": "check_duplicate_charge"
+                  }
+                },
+                {
+                  "key": "gen_ai.tool.call.id",
+                  "value": {
+                    "stringValue": "call_check_dup_002"
+                  }
+                },
+                {
+                  "key": "gen_ai.tool.call.arguments",
+                  "value": {
+                    "stringValue": "{\"order_id\": \"4521\"}"
+                  }
+                }
+              ],
+              "status": {},
+              "flags": 256
+            },
+            {
+              "traceId": "22R4u5dEPMTesWofSrG9Gw==",
+              "spanId": "k2OAgRCFyXs=",
+              "parentSpanId": "wmKDNgFsfFE=",
+              "name": "chat gpt-4o-mini",
+              "kind": "SPAN_KIND_INTERNAL",
+              "startTimeUnixNano": "1789461651128913000",
+              "endTimeUnixNano": "1789461651131438000",
+              "attributes": [
+                {
+                  "key": "gen_ai.operation.name",
+                  "value": {
+                    "stringValue": "chat"
+                  }
+                },
+                {
+                  "key": "gen_ai.request.model",
+                  "value": {
+                    "stringValue": "gpt-4o-mini"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.input_tokens",
+                  "value": {
+                    "intValue": "310"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.output_tokens",
+                  "value": {
+                    "intValue": "40"
+                  }
+                }
+              ],
+              "status": {},
+              "flags": 256
+            },
+            {
+              "traceId": "22R4u5dEPMTesWofSrG9Gw==",
+              "spanId": "djD2xq5BUA0=",
+              "parentSpanId": "wmKDNgFsfFE=",
+              "name": "execute_tool issue_refund",
+              "kind": "SPAN_KIND_INTERNAL",
+              "startTimeUnixNano": "1789461651131486000",
+              "endTimeUnixNano": "1789461651134026000",
+              "attributes": [
+                {
+                  "key": "gen_ai.operation.name",
+                  "value": {
+                    "stringValue": "execute_tool"
+                  }
+                },
+                {
+                  "key": "gen_ai.tool.name",
+                  "value": {
+                    "stringValue": "issue_refund"
+                  }
+                },
+                {
+                  "key": "gen_ai.tool.call.id",
+                  "value": {
+                    "stringValue": "call_refund_003"
+                  }
+                },
+                {
+                  "key": "gen_ai.tool.call.arguments",
+                  "value": {
+                    "stringValue": "{\"order_id\": \"4521\", \"amount\": \"full\"}"
+                  }
+                }
+              ],
+              "status": {},
+              "flags": 256
+            },
+            {
+              "traceId": "22R4u5dEPMTesWofSrG9Gw==",
+              "spanId": "uwJlK+QTXfc=",
+              "parentSpanId": "wmKDNgFsfFE=",
+              "name": "chat gpt-4o-mini",
+              "kind": "SPAN_KIND_INTERNAL",
+              "startTimeUnixNano": "1789461651134067000",
+              "endTimeUnixNano": "1789461651136601000",
+              "attributes": [
+                {
+                  "key": "gen_ai.operation.name",
+                  "value": {
+                    "stringValue": "chat"
+                  }
+                },
+                {
+                  "key": "gen_ai.request.model",
+                  "value": {
+                    "stringValue": "gpt-4o-mini"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.input_tokens",
+                  "value": {
+                    "intValue": "420"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.output_tokens",
+                  "value": {
+                    "intValue": "55"
+                  }
+                },
+                {
+                  "key": "gen_ai.output.messages",
+                  "value": {
+                    "stringValue": "I have verified the duplicate charge for order #4521. A full refund has been issued."
+                  }
+                }
+              ],
+              "status": {},
+              "flags": 256
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
