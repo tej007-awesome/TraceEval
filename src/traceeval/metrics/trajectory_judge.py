@@ -1,8 +1,6 @@
 from typing import List
 
-from openai import AsyncOpenAI
-
-from traceeval.core.config import settings
+from traceeval.core.config import get_judge_client, settings
 from traceeval.core.logger import logger
 from traceeval.core.schema import (
     AgentTrace,
@@ -120,7 +118,7 @@ async def evaluate_dimensions(
     case: EDDTestCase,
 ) -> EvaluationDimensionScore:
     """Use an OpenAI-compatible endpoint to evaluate the semantic quality of the agent's response."""
-    client = AsyncOpenAI()
+    client = get_judge_client()
 
     rubric_str = "\n".join(f"- {item}" for item in case.rubric)
 

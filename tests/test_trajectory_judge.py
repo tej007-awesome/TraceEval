@@ -258,12 +258,10 @@ def test_validate_system_constraints_reasons():
 
 
 @pytest.mark.asyncio
-@patch("traceeval.metrics.trajectory_judge.AsyncOpenAI")
-async def test_evaluate_dimensions(mock_async_openai_class, monkeypatch):
-    monkeypatch.setenv("OPENAI_API_KEY", "mock-key")
-    # Setup mocks
+@patch("traceeval.metrics.trajectory_judge.get_judge_client")
+async def test_evaluate_dimensions(mock_get_judge_client):
     mock_client = MagicMock()
-    mock_async_openai_class.return_value = mock_client
+    mock_get_judge_client.return_value = mock_client
 
     mock_response = MagicMock()
     mock_choice = MagicMock()
@@ -305,11 +303,10 @@ async def test_evaluate_dimensions(mock_async_openai_class, monkeypatch):
 
 
 @pytest.mark.asyncio
-@patch("traceeval.metrics.trajectory_judge.AsyncOpenAI")
-async def test_evaluate_dimensions_empty_response(mock_async_openai_class, monkeypatch):
-    monkeypatch.setenv("OPENAI_API_KEY", "mock-key")
+@patch("traceeval.metrics.trajectory_judge.get_judge_client")
+async def test_evaluate_dimensions_empty_response(mock_get_judge_client):
     mock_client = MagicMock()
-    mock_async_openai_class.return_value = mock_client
+    mock_get_judge_client.return_value = mock_client
 
     case = EDDTestCase(
         case_id="case_empty",
