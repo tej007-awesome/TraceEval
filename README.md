@@ -70,6 +70,11 @@ Perfect for pre-deployment CI/CD gating. Dynamically spawns your agent, captures
 ```bash
 traceeval run --case sample_data/case_01.json --pipeline examples.reference_agent:process_refund_success --export report.json
 ```
+**Mode C: Evaluate an OpenTelemetry (OTel) Trace**
+Audit OpenTelemetry traces adhering to GenAI semantic conventions.
+```bash
+traceeval run --case sample_data/case_01.json --otel-trace tests/fixtures/otel/refund_happy.json
+```
 
 *(Tip: Add `--verbose` right after `traceeval` to view detailed middleware logs!)*
 
@@ -111,6 +116,39 @@ TraceEval decouples the **Ingestion Layer** from the **Evaluation Engine** using
 
 1. **Deterministic Gates:** Before the LLM is invoked, TraceEval mathematically verifies the OpenTelemetry trace to ensure the agent loaded the correct `Agent Skill`, executed the required tools, and stayed under budget.
 2. **Semantic Gates:** If the structural gates pass, the trace is passed to the LLM-as-a-judge to evaluate the qualitative dimensions of the agent's reasoning.
+
+---
+
+## Evaluating OpenTelemetry Traces
+
+TraceEval natively ingests OpenTelemetry (OTel) JSON traces adhering to the **OTel GenAI Semantic Conventions**.
+
+```bash
+traceeval run --case sample_data/case_01.json --otel-trace tests/fixtures/otel/refund_happy.json
+```
+
+### Attributes Ingested
+TraceEval inspects the following GenAI span attributes:
+- `gen_ai.operation.name`: Identifies span types (`invoke_agent`, `chat`, `execute_tool`).
+- `gen_ai.agent.name` & `gen_ai.conversation.id`: Extracts agent skills and session metadata.
+- `gen_ai.request.model`, `gen_ai.usage.input_tokens`, `gen_ai.usage.output_tokens`: Tracks per-model token consumption.
+- `gen_ai.tool.name` & `gen_ai.tool.call.arguments`: Maps tool trajectories and parameters.
+- `gen_ai.output.messages`: Captures the agent's final text response.
+
+### Cost Computation & Custom Pricing
+Session token costs are automatically computed by matching `gen_ai.request.model` and token counts against model pricing rates. If pricing is missing for an unknown model, the cost check fails (`"cost could not be verified"`) to prevent unmonitored financial risk.
+
+You can supply custom pricing via `--pricing my_pricing.json`:
+```json
+{
+  "my-custom-model": {
+    "input_usd_per_1k": 0.00015,
+    "output_usd_per_1k": 0.0006
+  }
+}
+```
+
+> **Privacy Note:** Standard OTel instrumentation often redacts `gen_ai.tool.call.arguments` and `gen_ai.output.messages` to comply with privacy policies. When arguments are omitted, TraceEval outputs non-blocking warnings, and argument matching defaults to `{}`.
 
 ---
 

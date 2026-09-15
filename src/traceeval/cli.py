@@ -42,12 +42,14 @@ def main(
 def run(
     case_file: Path = typer.Option(..., "--case", "-c", help="Path to EDDTestCase JSON"),
     trace_file: Optional[Path] = typer.Option(None, "--trace", "-t", help="Path to static AgentTrace JSON"),
+    otel_trace: Optional[Path] = typer.Option(None, "--otel-trace", help="Path to OpenTelemetry trace JSON"),
     pipeline: Optional[str] = typer.Option(None, "--pipeline", "-p", help="Live agent function (e.g. 'examples.reference_agent:process_refund')"),
+    pricing: Optional[Path] = typer.Option(None, "--pricing", help="Path to custom JSON pricing file"),
     export_path: Optional[str] = typer.Option(None, "--export", "-e", help="Path to save the JSON EvaluationResult"),
     max_cost: float = typer.Option(0.10, "--max-cost", help="Maximum allowable session budget in USD"),
     score_threshold: float = typer.Option(0.8, "--score-threshold", help="Minimum score (0-1) that every non-null judge dimension must meet"),
 ):
-    """Run a TraceEval evaluation against a static trace or a live agent pipeline."""
+    """Run a TraceEval evaluation against a static trace, an OTel trace, or a live agent pipeline."""
     has_api_key = bool(settings.llm_api_key or os.environ.get("OPENAI_API_KEY"))
     has_base_url = bool(settings.llm_base_url)
     if not (has_api_key or has_base_url):
@@ -55,23 +57,36 @@ def run(
         console.print("Either LLM_API_KEY (or OPENAI_API_KEY) or LLM_BASE_URL must be configured.")
         raise typer.Exit(code=1)
 
-    if not trace_file and not pipeline:
-        console.print("[bold red]Error:[/bold red] You must provide either a static --trace file or a live --pipeline hook.")
+    provided = [x for x in [trace_file, otel_trace, pipeline] if x is not None]
+    if len(provided) != 1:
+        console.print(
+            "[bold red]Error:[/bold red] Exactly one of --trace, --otel-trace, or --pipeline must be provided."
+        )
         raise typer.Exit(code=1)
-    
+
     try:
         case = load_test_case(case_file)
-        
-        # Determine Execution Mode (Static vs Live)
+
+        # Determine Execution Mode (Static vs OTel vs Live)
         if pipeline:
             console.print(f"[dim]Mode: Live Pipeline execution ({pipeline})[/dim]")
             trace = run_live_pipeline(pipeline, case)
         elif trace_file:
             console.print(f"[dim]Mode: Static Batch execution ({trace_file})[/dim]")
             trace = load_trace(trace_file)
+        elif otel_trace:
+            console.print(f"[dim]Mode: OTel trace ({otel_trace})[/dim]")
+            from traceeval.loaders.otel import load_otel_trace
+            from traceeval.pricing import DEFAULT_PRICING, load_pricing
+
+            pricing_table = load_pricing(pricing) if pricing else DEFAULT_PRICING
+            otel_result = load_otel_trace(otel_trace, pricing=pricing_table)
+            for warning in otel_result.warnings:
+                console.print(f"[yellow]Warning:[/yellow] {warning}")
+            trace = otel_result.trace
         else:
-            raise ValueError("No trace file or pipeline provided.")
-            
+            raise ValueError("No valid trace or pipeline provided.")
+
     except Exception as e:
         console.print(f"[bold red]Ingestion Error:[/bold red] {e}")
         raise typer.Exit(code=1)
@@ -85,12 +100,12 @@ def run(
 
     # Render Terminal Output
     render_result(result)
-    
+
     # Handle Export
     if export_path:
         export_to_json(result, export_path)
         console.print(f"\n[dim]Report successfully exported to {export_path}[/dim]")
-    
+
     if not result.passed:
         raise typer.Exit(code=1)
 
