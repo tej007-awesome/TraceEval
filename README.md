@@ -154,11 +154,11 @@ You can supply custom pricing via `--pricing my_pricing.json`:
 
 ## Roadmap
 
-v0 ships the core EDD Schema, Trajectory Validator, BYOJ Engine, and Live Pipeline Hook. Planned for v1:
+v0.2 adds OpenTelemetry GenAI trace ingestion with computed cost and specific failure reasons. Planned next:
 
-- **OpenTelemetry trace ingestion:** Adapters to ingest native OTel spans from LangGraph, OpenAI Swarm, Claude SDK, and raw MCP servers — so you can point TraceEval at real production traces without converting them by hand.
-- **Live budget guard:** Real-time token-cost interception during agent execution, not just post-run checking.
-- **Offline mock judge mode:** Deterministic stub judge for CI pipelines that cannot call an external LLM (air-gapped environments, cost-sensitive PR checks).
+- **Flexible argument matching and forbidden tools:** match tool arguments exactly, partially, or not at all (for privacy-redacted traces), and fail any trajectory that calls a denied tool.
+- **More reliable LLM judge:** per-rubric-item verdicts, multiple samples, retries, and an offline mock judge for CI pipelines that can't call an external LLM.
+- **Meta-evaluation benchmark:** a labelled set of good and bad traces that measures how accurately TraceEval itself catches failures.
 
 To track granular progress, see our [GitHub Issues](https://github.com/tej007-awesome/TraceEval/issues).
 
