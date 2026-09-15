@@ -14,6 +14,12 @@ def render_result(result: EvaluationResult):
     console.print(f"\n[bold {status_color}]Result: {status_text}[/bold {status_color}]")
     console.print(f"Case ID: [bold]{result.case_id}[/bold]\n")
 
+    if result.failures:
+        console.print("[bold red]Failure Reasons:[/bold red]")
+        for reason in result.failures:
+            console.print(f"  [red]✗[/red] {reason}")
+        console.print()
+
     # Dimensions Table
     table = Table(title="Evaluation Dimensions", show_header=True, header_style="bold magenta")
     table.add_column("Dimension", style="cyan")

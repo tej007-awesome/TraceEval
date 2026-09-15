@@ -1,3 +1,4 @@
+import os
 import sys
 import asyncio
 import typer
@@ -44,11 +45,12 @@ def run(
     pipeline: Optional[str] = typer.Option(None, "--pipeline", "-p", help="Live agent function (e.g. 'examples.reference_agent:process_refund')"),
     export_path: Optional[str] = typer.Option(None, "--export", "-e", help="Path to save the JSON EvaluationResult"),
     max_cost: float = typer.Option(0.10, "--max-cost", help="Maximum allowable session budget in USD"),
-    score_threshold: float = typer.Option(0.8, "--score-threshold", help="Minimum score threshold for intent/correctness"),
+    score_threshold: float = typer.Option(0.8, "--score-threshold", help="Minimum score (0-1) that every non-null judge dimension must meet"),
 ):
     """Run a TraceEval evaluation against a static trace or a live agent pipeline."""
-    import os
-    if "OPENAI_API_KEY" not in os.environ and settings.llm_base_url is None:
+    has_api_key = bool(settings.llm_api_key or os.environ.get("OPENAI_API_KEY"))
+    has_base_url = bool(settings.llm_base_url)
+    if not (has_api_key or has_base_url):
         console.print("\n[bold red]Configuration Error:[/bold red]")
         console.print("Either LLM_API_KEY (or OPENAI_API_KEY) or LLM_BASE_URL must be configured.")
         raise typer.Exit(code=1)
