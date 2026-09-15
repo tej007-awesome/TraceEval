@@ -30,7 +30,7 @@ TraceEval shifts the industry to **Evaluation-Driven Development**. Before an ag
 
 **For End-Users & CI/CD Pipelines:**
 ```bash
-pip install trace-eval-core
+pip install traceeval
 ```
 
 **For Contributors:**
