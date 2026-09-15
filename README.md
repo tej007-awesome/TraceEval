@@ -1,94 +1,93 @@
-# TraceEval: Continuous Effective Trust for Autonomous Agents
+# TraceEval
 
+[![PyPI](https://img.shields.io/pypi/v/traceeval-cli.svg)](https://pypi.org/project/traceeval-cli/)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![YC Alignment](https://img.shields.io/badge/YC_S26_RFS-%2312_&_%2315-orange.svg)](#yc-alignment)
 
-**TraceEval** is an open-source CI/CD evaluation framework and policy governance kernel for autonomous AI agents. 
+**TraceEval is a CLI for testing AI agent trajectories in CI.** You write a test case describing what an agent *should* do: which tools it calls, in what order, within what budget, and what a good answer looks like. TraceEval checks the agent's trace against it and exits non-zero if it fails, so a pipeline can block the deploy.
 
-In 2024, developers worried about what AI would *say*. In 2026, enterprises worry about what AI will *do*. Traditional testing evaluates static text outputs. TraceEval evaluates **autonomous trajectories**, acting as the CI/CD gatekeeper to prevent hallucinations, malicious prompt injections, and infinite loops from reaching production.
+## Why trajectories
 
-## The Problem: The "Vibe Coding" Danger
-When agents possess ambient agency to execute code and access APIs, testing just the final output is dangerous. A traditional RAG evaluator might score an agent 100% for successfully refunding an order. However, it completely misses if the agent hallucinated 50 deprecated API calls and bypassed compliance checks to get there.
+Checking only an agent's final answer misses how it got there. An agent can reply "your refund has been issued" while skipping the duplicate-charge check, calling tools in the wrong order, or spending far more than it should. TraceEval tests the path, not just the output.
 
-## The Solution: Evaluation-Driven Development (EDD)
-TraceEval shifts the industry to **Evaluation-Driven Development**. Before an agent is deployed, developers define strict EDD JSON test cases. TraceEval then audits the agent's execution trace (the "Vibe Trajectory") against these criteria.
+## How it works
 
-### Core Features
-- **Trajectory Validation:** Enforce strict tool execution sequences (`EXACT`, `IN_ORDER`, `ANY_ORDER`) before evaluating semantic quality.
-- **Post-Run Budget Gate:** After each evaluation run, TraceEval checks `total_token_cost_usd` against a configurable ceiling and blocks deployment if the session exceeded it — preventing "Denial of Wallet" (DoW) infinite-loop behaviors from reaching production.
-- **Provider-Agnostic LLM-Judge:** Bring Your Own Judge (BYOJ). Evaluate traces using OpenAI, local models (vLLM/Ollama), or proxies (OpenRouter) via the universal OpenAI SDK standard.
-- **Live CI/CD Hooks & Exports:** Dynamically execute live Python agents in memory, evaluate them on the fly, and export results to JSON for CI/CD pipeline gating.
-- **Middleware Observability:** Zero-performance-impact logging. Run with `--verbose` to inspect ingestion boundaries and judge latency.
+Evaluation runs in two gates:
 
----
+1. **Deterministic gate (free, instant).** Checks the tool sequence against the test case (`EXACT`, `IN_ORDER`, or `ANY_ORDER`), confirms the expected agent skill ran, and checks the session cost against a budget. If anything fails, evaluation stops here with specific reasons, and no LLM is called.
+2. **Semantic gate (LLM-as-judge).** Only if gate 1 passes, an LLM scores the output on five dimensions against your rubric. Any score below the threshold fails the case, and a missing score on a required dimension also fails it.
+
+Every failure explains itself, for example:
+
+```text
+✗ expected check_duplicate_charge(order_id='4521') at position 1 was never called
+✗ cost $5.5000 exceeds budget $0.1000
+```
+
+## Features
+
+- **Three trace sources:** TraceEval JSON traces, OpenTelemetry GenAI traces, or a live Python agent function run in-process
+- **OpenTelemetry ingestion:** reads OTel GenAI semantic-convention spans directly, with no OpenTelemetry runtime dependency
+- **Computed cost:** from OTel token usage × a pricing table; unknown model pricing fails the budget check instead of reporting $0
+- **Specific failure reasons** for every deterministic and semantic failure
+- **Bring your own judge:** any OpenAI-compatible endpoint, including OpenAI, OpenRouter, vLLM, and Ollama
+- **CI-friendly:** exit code 1 on failure, plus JSON export of results
 
 ## Quickstart
 
-### 1. Installation
+### Install
 
-**For End-Users & CI/CD Pipelines:**
 ```bash
 pip install traceeval-cli
 ```
-*(Note: The CLI command (`traceeval`) and Python package import (`import traceeval`) remain `traceeval`.)*
 
-**For Contributors:**
-```bash
-git clone https://github.com/tej007-awesome/TraceEval.git
-cd TraceEval
-uv venv
-source .venv/bin/activate
-uv pip install -e ".[dev]"
-```
+The command and the Python import are both `traceeval`.
 
-### 2. Configuration
-Create a `.env` file in your root directory. TraceEval is provider-agnostic.
+### Configure the judge
+
+Create a `.env` file:
 
 ```env
-# Example A: Standard OpenAI
+# OpenAI
 LLM_API_KEY="sk-proj-..."
 LLM_MODEL_NAME="gpt-4o-mini"
 
-# Example B: Local/Proxy (e.g., OpenRouter, vLLM, Ollama)
-LLM_API_KEY="your-proxy-key"
+# Or any OpenAI-compatible endpoint (OpenRouter, vLLM, Ollama)
+LLM_API_KEY="your-key"
 LLM_BASE_URL="https://openrouter.ai/api/v1"
-LLM_MODEL_NAME="nvidia/nemotron-3-ultra-550b-a55b:free"
+LLM_MODEL_NAME="your-model-name"
 ```
 
-### 3. Run an Evaluation
+### Run an evaluation
 
-**Mode A: Evaluate a Static/Historical Trace**
-Perfect for daily log auditing and regression testing.
+The examples below use files from this repository, so clone it first to try them.
+
+**A TraceEval JSON trace:**
 ```bash
 traceeval run --case sample_data/case_01.json --trace sample_data/trace_01.json
 ```
 
-**Mode B: Evaluate a Live Agent Pipeline**
-Perfect for pre-deployment CI/CD gating. Dynamically spawns your agent, captures its trace, evaluates it, and exports the report.
-```bash
-traceeval run --case sample_data/case_01.json --pipeline examples.reference_agent:process_refund_success --export report.json
-```
-**Mode C: Evaluate an OpenTelemetry (OTel) Trace**
-Audit OpenTelemetry traces adhering to GenAI semantic conventions.
+**An OpenTelemetry trace:**
 ```bash
 traceeval run --case sample_data/case_01.json --otel-trace tests/fixtures/otel/refund_happy.json
 ```
 
-*(Tip: Add `--verbose` right after `traceeval` to view detailed middleware logs!)*
+**A live agent function**, exporting the result:
+```bash
+traceeval run --case sample_data/case_01.json --pipeline examples.reference_agent:process_refund_success --export report.json
+```
 
-**Expected Output:**
+Add `--verbose` after `traceeval` for detailed logs.
+
+**Example output:**
 ```text
-TraceEval initializing...
-Mode: Live Pipeline execution (examples.reference_agent:process_refund_success)
-
-⠧ Evaluating Vibe Trajectory & Dimensions via nvidia/nemotron-3-ultra-550b-a55b:free...
+Mode: OTel trace (tests/fixtures/otel/refund_happy.json)
 
 Result: PASSED (Safe to Deploy)
 Case ID: refund_001
 
-  Evaluation Dimensions
+      Evaluation Dimensions
 ┏━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━┓
 ┃ Dimension              ┃ Score ┃
 ┡━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━┩
@@ -98,73 +97,103 @@ Case ID: refund_001
 │ Cost Efficiency        │   1.0 │
 │ Safety & RAI           │   1.0 │
 └────────────────────────┴───────┘
-╭──────────────────────── LLM Judge Reasoning ─────────────────────────╮
-│ The agent fully addressed the user's intent by verifying the         │
-│ duplicate charge and issuing a full refund, as reflected in the      │
-│ final output. The tool trajectory is logically ordered (lookup,      │
-│ verify, refund) with no redundant calls. The process is efficient,   │
-│ using only necessary steps. No safety or ethical concerns present.   │
-╰──────────────────────────────────────────────────────────────────────╯
-Report successfully exported to report.json
 ```
 
----
+## Writing a test case
 
-## Architecture
-
-TraceEval decouples the **Ingestion Layer** from the **Evaluation Engine** using strict Pydantic v2 data contracts. 
-
-1. **Deterministic Gates:** Before the LLM is invoked, TraceEval mathematically verifies the OpenTelemetry trace to ensure the agent loaded the correct `Agent Skill`, executed the required tools, and stayed under budget.
-2. **Semantic Gates:** If the structural gates pass, the trace is passed to the LLM-as-a-judge to evaluate the qualitative dimensions of the agent's reasoning.
-
----
-
-## Evaluating OpenTelemetry Traces
-
-TraceEval natively ingests OpenTelemetry (OTel) JSON traces adhering to the **OTel GenAI Semantic Conventions**.
-
-```bash
-traceeval run --case sample_data/case_01.json --otel-trace tests/fixtures/otel/refund_happy.json
-```
-
-### Attributes Ingested
-TraceEval inspects the following GenAI span attributes:
-- `gen_ai.operation.name`: Identifies span types (`invoke_agent`, `chat`, `execute_tool`).
-- `gen_ai.agent.name` & `gen_ai.conversation.id`: Extracts agent skills and session metadata.
-- `gen_ai.request.model`, `gen_ai.usage.input_tokens`, `gen_ai.usage.output_tokens`: Tracks per-model token consumption.
-- `gen_ai.tool.name` & `gen_ai.tool.call.arguments`: Maps tool trajectories and parameters.
-- `gen_ai.output.messages`: Captures the agent's final text response.
-
-### Cost Computation & Custom Pricing
-Session token costs are automatically computed by matching `gen_ai.request.model` and token counts against model pricing rates. If pricing is missing for an unknown model, the cost check fails (`"cost could not be verified"`) to prevent unmonitored financial risk.
-
-You can supply custom pricing via `--pricing my_pricing.json`:
 ```json
 {
-  "my-custom-model": {
-    "input_usd_per_1k": 0.00015,
-    "output_usd_per_1k": 0.0006
+  "case_id": "refund_001",
+  "input_prompt": "I was charged twice for order #4521. Please fix this.",
+  "expected_skill": "refund-processor",
+  "expected_tool_calls": [
+    {"tool_name": "lookup_order", "args": {"order_id": "4521"}},
+    {"tool_name": "check_duplicate_charge", "args": {"order_id": "4521"}},
+    {"tool_name": "issue_refund", "args": {"order_id": "4521", "amount": "full"}}
+  ],
+  "trajectory_mode": "IN_ORDER",
+  "rubric": [
+    "Acknowledges the duplicate charge.",
+    "Confirms the refund has been processed.",
+    "Maintains a polite, professional tone."
+  ]
+}
+```
+
+| Mode | Passes when |
+|---|---|
+| `EXACT` | The trace contains exactly these calls, in this order, with nothing extra |
+| `IN_ORDER` | These calls appear in this order; other calls may occur in between |
+| `ANY_ORDER` | All these calls appear, in any order; other calls may occur |
+
+Tool arguments are currently matched exactly.
+
+## Evaluating OpenTelemetry traces
+
+TraceEval reads OTLP JSON traces that follow the OpenTelemetry GenAI semantic conventions:
+
+| Span attribute | Used for |
+|---|---|
+| `gen_ai.operation.name` | Span type: `invoke_agent`, `chat`, `execute_tool` |
+| `gen_ai.tool.name`, `gen_ai.tool.call.arguments` | Tool calls, ordered by span start time |
+| `gen_ai.agent.name` | The agent skill that ran |
+| `gen_ai.conversation.id` | Session ID (falls back to the trace ID) |
+| `gen_ai.request.model`, `gen_ai.usage.input_tokens`, `gen_ai.usage.output_tokens` | Cost |
+| `gen_ai.output.messages` | Final output |
+
+The GenAI conventions are still evolving, so attribute names live in a single module (`otel_attributes.py`).
+
+### Cost and pricing
+
+Cost is computed from each `chat` span's token counts and a pricing table. The built-in table covers only `gpt-4o-mini`. For any other model, supply a pricing file with prices per million tokens:
+
+```json
+{
+  "your-model-name": {
+    "input_per_1m_usd": 0.15,
+    "output_per_1m_usd": 0.60
   }
 }
 ```
 
-> **Privacy Note:** Standard OTel instrumentation often redacts `gen_ai.tool.call.arguments` and `gen_ai.output.messages` to comply with privacy policies. When arguments are omitted, TraceEval outputs non-blocking warnings, and argument matching defaults to `{}`.
+```bash
+traceeval run --case case.json --otel-trace trace.json --pricing pricing.json
+```
 
----
+If any model in the trace has no price, the budget check **fails** with "cost could not be verified." Prices change, so treat the built-in table as a starting point, not a billing source.
+
+### Privacy-redacted traces
+
+Many OTel instrumentations don't record tool arguments or message content by default. TraceEval still loads these traces and prints a warning, but the missing arguments are treated as empty, so exact argument matching will fail. Flexible argument matching is planned (see Roadmap).
+
+## Limitations
+
+- Tool arguments are matched exactly.
+- `IN_ORDER` and `ANY_ORDER` allow extra tool calls, so they won't catch an unexpected dangerous call. Use `EXACT`, or wait for forbidden-tool support.
+- The judge makes a single call per case, with no multi-sample aggregation yet.
+- JSON traces report their own cost. Only OTel traces have computed cost.
+- The bundled benchmark in `test_suite/` is small and synthetic.
+
+## How it compares
+
+Established tools cover much of this space and do more. [DeepEval](https://github.com/confident-ai/deepeval) offers a large metric library with pytest integration, and LangChain's [agentevals](https://github.com/langchain-ai/agentevals) provides trajectory-match evaluators with configurable modes. TraceEval is deliberately small: a single CLI that combines deterministic trajectory checks, cost budgets, and an LLM judge into one pass/fail gate, with OTel traces as a first-class input.
 
 ## Roadmap
 
-v0.2 adds OpenTelemetry GenAI trace ingestion with computed cost and specific failure reasons. Planned next:
+- **Flexible argument matching and forbidden tools:** match arguments exactly, partially, or not at all, and fail any trajectory that calls a denied tool ([#5](https://github.com/tej007-awesome/TraceEval/issues/5))
+- **More reliable LLM judge:** per-rubric verdicts, multiple samples, retries, and an offline mock judge for CI ([#6](https://github.com/tej007-awesome/TraceEval/issues/6))
+- **Meta-evaluation benchmark:** a labelled set of good and bad traces that measures how accurately TraceEval catches failures ([#7](https://github.com/tej007-awesome/TraceEval/issues/7))
 
-- **Flexible argument matching and forbidden tools:** match tool arguments exactly, partially, or not at all (for privacy-redacted traces), and fail any trajectory that calls a denied tool.
-- **More reliable LLM judge:** per-rubric-item verdicts, multiple samples, retries, and an offline mock judge for CI pipelines that can't call an external LLM.
-- **Meta-evaluation benchmark:** a labelled set of good and bad traces that measures how accurately TraceEval itself catches failures.
+## Contributing
 
-To track granular progress, see our [GitHub Issues](https://github.com/tej007-awesome/TraceEval/issues).
+```bash
+git clone https://github.com/tej007-awesome/TraceEval.git
+cd TraceEval
+uv venv && source .venv/bin/activate
+uv pip install -e ".[dev]"
+pytest && ruff check .
+```
 
----
+## License
 
-## YC Alignment
-This project is built explicitly to answer **YC Summer 2026 Requests for Startups**:
-*   **#12 — Software for Agents:** Agents are the next trillion internet users. TraceEval provides the machine-readable, programmatic testing infrastructure required to deploy them safely.
-*   **#15 — The AI Operating System for Companies:** TraceEval acts as the "Kernel Panic monitor" and compliance gateway for the enterprise AI OS, making autonomous behavior legible and controllable to stakeholders.
+MIT
