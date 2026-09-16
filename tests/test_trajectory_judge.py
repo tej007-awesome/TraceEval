@@ -847,3 +847,121 @@ async def test_run_evaluation_failure_details_ordering(mock_eval_dimensions):
     assert "step 0" in res.failures[0]
     assert "forbidden tool" in res.failures[-1]
     mock_eval_dimensions.assert_not_called()
+
+
+def test_edd_test_case_forbidden_args_contradiction_exact_raises():
+    with pytest.raises(ValidationError):
+        EDDTestCase(
+            case_id="c1",
+            input_prompt="p",
+            expected_tool_calls=[ExpectedToolCall(tool_name="issue_refund", args={"amount": "100"}, arg_match_mode=ArgMatchMode.EXACT)],
+            forbidden_args={"issue_refund": [{"amount": "^100$"}]},
+            rubric=["r"],
+        )
+
+
+def test_edd_test_case_forbidden_args_regex_mode_loads_fine():
+    case = EDDTestCase(
+        case_id="c1",
+        input_prompt="p",
+        expected_tool_calls=[ExpectedToolCall(tool_name="issue_refund", args={"amount": r"^1\d+$"}, arg_match_mode=ArgMatchMode.REGEX)],
+        forbidden_args={"issue_refund": [{"amount": "^1"}]},
+        rubric=["r"],
+    )
+    assert case.case_id == "c1"
+
+
+def test_edd_test_case_forbidden_args_multikey_partial_present_loads_fine():
+    case = EDDTestCase(
+        case_id="c1",
+        input_prompt="p",
+        expected_tool_calls=[ExpectedToolCall(tool_name="issue_refund", args={"amount": "100"}, arg_match_mode=ArgMatchMode.EXACT)],
+        forbidden_args={"issue_refund": [{"amount": "^100$", "reason": "^fraud$"}]},
+        rubric=["r"],
+    )
+    assert case.case_id == "c1"
+
+
+def test_distinct_miss_binding_two_mismatches():
+    exp = [
+        ExpectedToolCall(tool_name="search", args={"q": "a"}),
+        ExpectedToolCall(tool_name="search", args={"q": "b"}),
+    ]
+    act = [
+        ToolCall(tool_name="search", args={"q": "wrong_1"}),
+        ToolCall(tool_name="search", args={"q": "wrong_2"}),
+    ]
+    # ANY_ORDER
+    r_any = validate_trajectory(exp, act, TrajectoryMode.ANY_ORDER)
+    assert len(r_any.reason_details) == 2
+    assert r_any.reason_details[0].code == FailureCode.ARG_MISMATCH
+    assert r_any.reason_details[0].step_index == 0
+    assert r_any.reason_details[1].code == FailureCode.ARG_MISMATCH
+    assert r_any.reason_details[1].step_index == 1
+
+    # IN_ORDER
+    r_in = validate_trajectory(exp, act, TrajectoryMode.IN_ORDER)
+    assert len(r_in.reason_details) == 2
+    assert r_in.reason_details[0].code == FailureCode.ARG_MISMATCH
+    assert r_in.reason_details[0].step_index == 0
+    assert r_in.reason_details[1].code == FailureCode.ARG_MISMATCH
+    assert r_in.reason_details[1].step_index == 1
+
+
+def test_distinct_miss_binding_one_mismatch_one_absent():
+    exp = [
+        ExpectedToolCall(tool_name="search", args={"q": "a"}),
+        ExpectedToolCall(tool_name="search", args={"q": "b"}),
+    ]
+    act = [ToolCall(tool_name="search", args={"q": "wrong_1"})]
+
+    # ANY_ORDER
+    r_any = validate_trajectory(exp, act, TrajectoryMode.ANY_ORDER)
+    assert len(r_any.reason_details) == 2
+    assert r_any.reason_details[0].code == FailureCode.ARG_MISMATCH
+    assert r_any.reason_details[0].step_index == 0
+    assert r_any.reason_details[1].code == FailureCode.TOOL_CALL_NOT_FOUND
+
+    # IN_ORDER
+    r_in = validate_trajectory(exp, act, TrajectoryMode.IN_ORDER)
+    assert len(r_in.reason_details) == 2
+    assert r_in.reason_details[0].code == FailureCode.ARG_MISMATCH
+    assert r_in.reason_details[0].step_index == 0
+    assert r_in.reason_details[1].code == FailureCode.TOOL_CALL_NEVER_CALLED
+
+
+def test_args_match_subset_with_exact_field_override():
+    exp = ExpectedToolCall(
+        tool_name="search", args={"q": "python", "limit": 10},
+        arg_match_mode=ArgMatchMode.SUBSET, field_overrides={"limit": ArgMatchMode.EXACT},
+    )
+    ok = ToolCall(tool_name="search", args={"q": "python", "limit": 10, "extra": "allowed"})
+    bad = ToolCall(tool_name="search", args={"q": "python", "limit": 99, "extra": "allowed"})
+    assert validate_trajectory([exp], [ok], TrajectoryMode.EXACT).passed is True
+    assert validate_trajectory([exp], [bad], TrajectoryMode.EXACT).passed is False
+
+
+def test_args_match_any_with_regex_field_override():
+    exp = ExpectedToolCall(
+        tool_name="search", args={"q": r"^py\d+$", "category": "unused"},
+        arg_match_mode=ArgMatchMode.ANY, field_overrides={"q": ArgMatchMode.REGEX},
+    )
+    ok = ToolCall(tool_name="search", args={"q": "py3", "category": "books"})
+    bad = ToolCall(tool_name="search", args={"q": "java", "category": "books"})
+    assert validate_trajectory([exp], [ok], TrajectoryMode.EXACT).passed is True
+    assert validate_trajectory([exp], [bad], TrajectoryMode.EXACT).passed is False
+
+
+def test_validate_forbidden_args_multikey_and_logic():
+    case = EDDTestCase(
+        case_id="c", input_prompt="p", rubric=["r"],
+        forbidden_args={"issue_refund": [{"amount": "^100$", "reason": "^fraud$"}]},
+    )
+    # Only amount matches -> Passes
+    partial = [ToolCall(tool_name="issue_refund", args={"amount": "100", "reason": "customer_req"})]
+    assert validate_forbidden_tools(partial, case).passed is True
+
+    # Both match -> Fails
+    full = [ToolCall(tool_name="issue_refund", args={"amount": "100", "reason": "fraud"})]
+    assert validate_forbidden_tools(full, case).passed is False
+

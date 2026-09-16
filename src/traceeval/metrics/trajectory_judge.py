@@ -1,5 +1,5 @@
 import re
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 from traceeval.core.config import get_judge_client, settings
 from traceeval.core.logger import logger
@@ -64,12 +64,18 @@ def _classify_miss(
     expected_idx: int,
     absent_code: FailureCode,
     message: str,
+    used_miss_indices: Optional[Set[int]] = None,
 ) -> FailureReason:
     """Classify why `expected_tc` has no match, considering only UNCONSUMED actual calls
     (i.e. calls not already matched to some other expected call) so an actual call that
     already satisfied an earlier expectation isn't double-counted as an arg mismatch here."""
+    if used_miss_indices is None:
+        used_miss_indices = set()
     for a_idx, a in unconsumed:
+        if a_idx in used_miss_indices:
+            continue
         if a.tool_name == expected_tc.tool_name:
+            used_miss_indices.add(a_idx)
             return FailureReason(
                 code=FailureCode.ARG_MISMATCH,
                 message=message,
@@ -158,6 +164,7 @@ def validate_trajectory(
 
         reasons = []
         reason_details = []
+        used_miss_indices: Set[int] = set()
         for rank, i in enumerate(range(expected_idx, len(expected))):
             exp_tool = expected[i]
             # Only search UNCONSUMED actual calls: a full match that was already used to
@@ -178,12 +185,12 @@ def validate_trajectory(
                 else:
                     msg = f"expected {_fmt_tool(exp_tool)} at position {i} was never called"
                     reasons.append(msg)
-                    reason_details.append(_classify_miss(exp_tool, unconsumed, i, FailureCode.TOOL_CALL_NEVER_CALLED, msg))
+                    reason_details.append(_classify_miss(exp_tool, unconsumed, i, FailureCode.TOOL_CALL_NEVER_CALLED, msg, used_miss_indices))
             elif not present_anywhere:
                 # Later unmatched: only report when genuinely absent from the trace.
                 msg = f"expected {_fmt_tool(exp_tool)} at position {i} was never called"
                 reasons.append(msg)
-                reason_details.append(_classify_miss(exp_tool, unconsumed, i, FailureCode.TOOL_CALL_NEVER_CALLED, msg))
+                reason_details.append(_classify_miss(exp_tool, unconsumed, i, FailureCode.TOOL_CALL_NEVER_CALLED, msg, used_miss_indices))
         return CheckResult(passed=not reasons, reasons=reasons, reason_details=reason_details)
 
     elif mode == TrajectoryMode.ANY_ORDER:
@@ -193,12 +200,13 @@ def validate_trajectory(
 
         reasons = []
         reason_details = []
+        used_miss_indices: Set[int] = set()
         for i, exp_tool in enumerate(expected):
             if i in matching:
                 continue
             msg = f"expected call {_fmt_tool(exp_tool)} not found in trace"
             reasons.append(msg)
-            reason_details.append(_classify_miss(exp_tool, unconsumed, i, FailureCode.TOOL_CALL_NOT_FOUND, msg))
+            reason_details.append(_classify_miss(exp_tool, unconsumed, i, FailureCode.TOOL_CALL_NOT_FOUND, msg, used_miss_indices))
         return CheckResult(passed=not reasons, reasons=reasons, reason_details=reason_details)
 
     return CheckResult(passed=False, reasons=["unknown trajectory mode"])

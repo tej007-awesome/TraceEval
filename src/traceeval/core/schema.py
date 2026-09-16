@@ -139,6 +139,24 @@ class EDDTestCase(BaseModel):
             raise ValueError(
                 f"tool(s) {sorted(overlap)} appear in both expected_tool_calls and forbidden_tools"
             )
+        for tc in self.expected_tool_calls:
+            for ruleset in self.forbidden_args.get(tc.tool_name, []):
+                match = True
+                for arg_name, pattern in ruleset.items():
+                    if arg_name not in tc.args:
+                        match = False
+                        break
+                    eff_mode = tc.field_overrides.get(arg_name, tc.arg_match_mode)
+                    if eff_mode not in (ArgMatchMode.EXACT, ArgMatchMode.SUBSET):
+                        match = False
+                        break
+                    if not re.search(pattern, str(tc.args[arg_name])):
+                        match = False
+                        break
+                if match:
+                    raise ValueError(
+                        f"expected_tool_call '{tc.tool_name}' contradicts forbidden_args rule-set {ruleset}"
+                    )
         return self
 
 class AgentTrace(BaseModel):
