@@ -405,6 +405,12 @@ def main():
     parser.add_argument("--concurrency", type=int, default=8, help="Max concurrent judge calls (cache-miss items only).")
     parser.add_argument("--cache-dir", type=Path, default=DEFAULT_CACHE_DIR)
     parser.add_argument("--no-cache", action="store_true")
+    parser.add_argument(
+        "--refresh-cache", action="store_true",
+        help="Bypass cache reads and overwrite every entry with a fresh judge call - same "
+        "effect as --no-cache (writes always happen regardless of the read-bypass flag used), "
+        "under the name that matches 'the cache is stale, recompute everything' intent.",
+    )
     parser.add_argument("--output", type=Path, default=Path("benchmarks/results.json"))
     args = parser.parse_args()
 
@@ -428,7 +434,7 @@ def main():
         pricing = dict(DEFAULT_PRICING)
         outcomes, cost_cap_hit, returned_model_ids = asyncio.run(run_judge_mode(
             scenarios, args.seed, args.k, args.judge_model, args.judge_temperature, args.reasoning_effort,
-            args.max_total_cost_usd, args.cache_dir, use_cache=not args.no_cache, pricing=pricing,
+            args.max_total_cost_usd, args.cache_dir, use_cache=not (args.no_cache or args.refresh_cache), pricing=pricing,
             concurrency=args.concurrency,
         ))
 
