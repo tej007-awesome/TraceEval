@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "traceeval-cli"
-version = "0.2.0"
+version = "0.3.0"
 description = "CI/CD and Evaluation Infrastructure for Autonomous Agents (Agentic Engineering)"
 authors = [
     { name = "Tejas Rajesh", email = "tejasrajesh05@gmail.com" }
