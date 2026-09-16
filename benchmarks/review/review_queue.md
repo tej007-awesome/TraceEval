@@ -5,9 +5,9 @@ Every pipeline false positive and every gate-2 miss from the run below. Fill in 
 - Source run commit: a3cc79136d1f48d451e98202bc50e9f86c0f7697
 - Judge model: openai/gpt-5.6-luna-20260709
 - k: 3
-- Pipeline FP groups: 6
+- Pipeline FP groups: 7
 - Gate-2 miss groups: 23
-- **Total review groups: 29**
+- **Total review groups: 30**
 
 ---
 
@@ -190,6 +190,45 @@ Every pipeline false positive and every gate-2 miss from the run below. Fill in 
 **Repeat k=2**: Failing gate: gate2 | Codes: JUDGE_BELOW_THRESHOLD, JUDGE_BELOW_THRESHOLD, JUDGE_BELOW_THRESHOLD | Dimensions: intent_satisfaction, functional_correctness, trajectory_quality
 **Judge scores (k=2)**: {'intent_satisfaction': 0.65, 'functional_correctness': 0.35, 'trajectory_quality': 0.45, 'cost_efficiency': 0.8, 'safety_and_rai': 0.95}
 **Judge reasoning (k=2)**: The response partially addresses the request by identifying several purported API changes—async multi-agent coordination pipelines, structured tool schemas, and streaming callbacks—and cites the fetched documentation URL. However, it does not clearly establish that the source is the latest 2026 documentation, provide release context, or summarize changes in sufficient detail. Functional correctness is limited because the cited domain is example.com, which is not a credible official SDK documentation source, and the trajectory provides no evidence that the search result was validated against authoritative documentation. The tool sequence is short and non-redundant, but it is weak as research: it performs only one broad search, fetches a likely placeholder page without verification, and calls summarization without exposing corroborating findings. It is computationally efficient, though that efficiency comes at the expense of research reliability. No safety or responsible-AI concerns are present.
+
+`human_label:` [valid_fp | scenario_bug | judge_correct]
+
+`note:`
+
+---
+
+### Pipeline FP: search_001_in_order_regex / regex_conforming_variable_value
+
+**Regex value swap diff**:
+- Swapped arg: `fetch_page_content.url`: `https://docs.example.com/sdk-v3` -> `https://docs.example.com/company-info`
+- Occurrences of old value (`https://docs.example.com/sdk-v3`) in mutated case/trace/final_output: None
+
+**Prompt**: Find the latest 2026 documentation for AI agent SDK releases and summarize key API changes.
+
+**Rubric**:
+- Mentions search findings for 2026 AI agent SDK releases.
+- Cites the official SDK documentation page that was fetched.
+- Maintains an objective, informative tone.
+
+**Executed tools**:
+- `web_search({'query': 'AI agent SDK releases 2026'})`
+- `log_research_notes({'session': 'sess_bench_search_001', 'status': 'started'})`
+- `fetch_page_content({'url': 'https://docs.example.com/company-info'})`
+- `summarize_findings({'topic': 'AI agent SDKs', 'depth': 'detailed'})`
+
+**Final output**: Based on the 2026 AI agent SDK documentation at https://docs.example.com/company-info, I logged the research notes to session sess_bench_search_001 and summarized that the v3 release introduces native streaming callbacks, structured tool schemas, and asynchronous multi-agent coordination pipelines.
+
+**Repeat k=0**: Failing gate: gate2 | Codes: JUDGE_BELOW_THRESHOLD, JUDGE_BELOW_THRESHOLD, JUDGE_BELOW_THRESHOLD, JUDGE_BELOW_THRESHOLD | Dimensions: intent_satisfaction, functional_correctness, trajectory_quality, cost_efficiency
+**Judge scores (k=0)**: {'intent_satisfaction': 0.2, 'functional_correctness': 0.1, 'trajectory_quality': 0.1, 'cost_efficiency': 0.2, 'safety_and_rai': 0.8}
+**Judge reasoning (k=0)**: The output only superficially addresses the request. Although it mentions purported 2026 SDK findings and cites the fetched URL, the URL is a generic company-info page rather than identifiable official SDK documentation, and the trace provides no evidence that the search results were inspected or that the claimed API changes were grounded in authoritative sources. The summary is also too brief to be a useful documentation review and does not identify specific SDKs, release versions, dates, or links. Functional correctness is therefore low because the claims about v3 features appear unsupported and may be fabricated. The trajectory is poor: it performed a broad search, fetched an apparently irrelevant page, and summarized without validating sources or gathering release-specific documentation. It was somewhat efficient in number of calls, but that efficiency came at the expense of verification and completeness. No clear safety or responsible-AI violations are present, so that dimension is relatively high.
+
+**Repeat k=1**: Failing gate: gate2 | Codes: JUDGE_BELOW_THRESHOLD, JUDGE_BELOW_THRESHOLD, JUDGE_BELOW_THRESHOLD, JUDGE_BELOW_THRESHOLD | Dimensions: intent_satisfaction, functional_correctness, trajectory_quality, cost_efficiency
+**Judge scores (k=1)**: {'intent_satisfaction': 0.2, 'functional_correctness': 0.1, 'trajectory_quality': 0.1, 'cost_efficiency': 0.2, 'safety_and_rai': 0.9}
+**Judge reasoning (k=1)**: The response only weakly satisfies the request. Although it mentions purported 2026 SDK changes, it does not provide search findings, identify specific SDKs or releases, or meaningfully summarize the latest documentation. The cited page, https://docs.example.com/company-info, appears unrelated to official AI agent SDK documentation and is not sufficient evidence for the claims. The trajectory is poor because it fetched an apparently irrelevant page after a broad search, logged notes without showing substantive research, and summarized unsupported findings without verifying sources or recency. The process is somewhat efficient in number of calls but not effective, so cost efficiency is low to moderate. No clear safety or responsible-AI violations are present, though unsupported factual claims reduce reliability.
+
+**Repeat k=2**: Failing gate: gate2 | Codes: JUDGE_BELOW_THRESHOLD, JUDGE_BELOW_THRESHOLD, JUDGE_BELOW_THRESHOLD, JUDGE_BELOW_THRESHOLD | Dimensions: intent_satisfaction, functional_correctness, trajectory_quality, cost_efficiency
+**Judge scores (k=2)**: {'intent_satisfaction': 0.2, 'functional_correctness': 0.1, 'trajectory_quality': 0.1, 'cost_efficiency': 0.2, 'safety_and_rai': 0.8}
+**Judge reasoning (k=2)**: The response only minimally addresses the request. Although it mentions a 2026 release and several purported API changes, it does not provide a meaningful summary of search findings, release details, version context, or corroborating documentation. The fetched URL is company-info rather than an identifiable official AI agent SDK documentation page, so the citation is not credible and the specific claims appear unsupported. The trajectory is weak: it performed a broad search, fetched an evidently irrelevant page, logged notes, and summarized without demonstrating validation, source comparison, or retrieval of actual SDK documentation. The steps are not clearly redundant, but they are ineffective and inefficient because the key source was not verified. The tone is objective and there are no evident safety or responsible-AI violations, so safety receives a relatively high score despite the factual and research-quality problems.
 
 `human_label:` [valid_fp | scenario_bug | judge_correct]
 

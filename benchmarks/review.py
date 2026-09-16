@@ -32,10 +32,92 @@ def _find_mutated(scenario: Scenario, operator: str, seed: int) -> Tuple[Optiona
     return None, None
 
 
-def _render_group_entry(kind: str, scenario_id: str, operator: str, recs: List[dict], case, trace) -> List[str]:
+def _find_regex_diff(
+    scenario: Optional[Scenario],
+    mutated_case: Optional[object],
+    mutated_trace: Optional[object],
+) -> List[str]:
+    lines: List[str] = []
+    if scenario is None or mutated_case is None or mutated_trace is None:
+        return lines
+
+    swapped_arg_str = None
+    old_str = None
+    new_str = None
+    for i, tc in enumerate(scenario.trace.executed_tools):
+        if i < len(mutated_trace.executed_tools):
+            m_tc = mutated_trace.executed_tools[i]
+            for k, v in tc.args.items():
+                if k in m_tc.args and m_tc.args[k] != v:
+                    old_str = str(v)
+                    new_str = str(m_tc.args[k])
+                    swapped_arg_str = f"`{tc.tool_name}.{k}`: `{old_str}` -> `{new_str}`"
+                    break
+            if swapped_arg_str:
+                break
+
+    if not swapped_arg_str or old_str is None:
+        return lines
+
+    lines.append("**Regex value swap diff**:")
+    lines.append(f"- Swapped arg: {swapped_arg_str}")
+
+    occurrences: List[str] = []
+    if old_str in mutated_case.input_prompt:
+        occurrences.append("`case.input_prompt`")
+
+    for idx, r_item in enumerate(mutated_case.rubric):
+        if old_str in r_item:
+            occurrences.append(f"`case.rubric[{idx}]` ({r_item})")
+
+    for idx, etc in enumerate(mutated_case.expected_tool_calls):
+        if old_str in str(etc.args) or old_str in str(etc.field_overrides):
+            occurrences.append(f"`case.expected_tool_calls[{idx}]` ({etc.tool_name})")
+
+    if old_str in str(mutated_case.forbidden_tools) or old_str in str(mutated_case.forbidden_args):
+        occurrences.append("`case.forbidden_tools/forbidden_args`")
+
+    if mutated_case.expected_skill and old_str in mutated_case.expected_skill:
+        occurrences.append("`case.expected_skill`")
+
+    if mutated_trace.session_id and old_str in mutated_trace.session_id:
+        occurrences.append("`trace.session_id`")
+
+    if old_str in str(mutated_trace.triggered_skills):
+        occurrences.append("`trace.triggered_skills`")
+
+    for idx, t_call in enumerate(mutated_trace.executed_tools):
+        if old_str in str(t_call.args):
+            occurrences.append(f"`trace.executed_tools[{idx}]` ({t_call.tool_name})")
+
+    if old_str in mutated_trace.final_output:
+        occurrences.append("`trace.final_output`")
+
+    if occurrences:
+        lines.append(f"- Occurrences of old value (`{old_str}`) in mutated case/trace/final_output:")
+        for occ in occurrences:
+            lines.append(f"  - {occ}")
+    else:
+        lines.append(f"- Occurrences of old value (`{old_str}`) in mutated case/trace/final_output: None")
+
+    lines.append("")
+    return lines
+
+
+def _render_group_entry(
+    kind: str,
+    scenario_id: str,
+    operator: str,
+    recs: List[dict],
+    case,
+    trace,
+    scenario: Optional[Scenario] = None,
+) -> List[str]:
     lines: List[str] = []
     lines.append(f"### {kind}: {scenario_id} / {operator}")
     lines.append("")
+    if operator == "regex_conforming_variable_value":
+        lines.extend(_find_regex_diff(scenario, case, trace))
     if case is not None:
         lines.append(f"**Prompt**: {case.input_prompt}")
         lines.append("")
@@ -94,8 +176,6 @@ def build_review_queue(
         holdout_ids = set(load_holdout(holdout_path))
         outcomes = [o for o in outcomes if o.scenario_id not in holdout_ids]
 
-    outcomes = [o for o in outcomes if o.operator != "regex_conforming_variable_value"]
-
     scenarios = {s.id: s for s in load_scenarios(scenarios_dir)}
 
     fps = list_false_positives(outcomes)
@@ -139,7 +219,7 @@ def build_review_queue(
         case, trace = (None, None)
         if scenario is not None:
             case, trace = _find_mutated(scenario, operator, seed)
-        lines.extend(_render_group_entry("Pipeline FP", scenario_id, operator, recs, case, trace))
+        lines.extend(_render_group_entry("Pipeline FP", scenario_id, operator, recs, case, trace, scenario))
 
     for scenario_id, operator in sorted_miss_keys:
         recs = miss_groups_dict[(scenario_id, operator)]
@@ -147,7 +227,7 @@ def build_review_queue(
         case, trace = (None, None)
         if scenario is not None:
             case, trace = _find_mutated(scenario, operator, seed)
-        lines.extend(_render_group_entry("Gate-2 miss", scenario_id, operator, recs, case, trace))
+        lines.extend(_render_group_entry("Gate-2 miss", scenario_id, operator, recs, case, trace, scenario))
 
     return "\n".join(lines)
 
