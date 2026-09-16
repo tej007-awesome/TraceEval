@@ -27,6 +27,20 @@ class Settings(BaseSettings):
         alias="LLM_MODEL_NAME",
         description="Model name to target for the judge evaluations",
     )
+    judge_temperature: Optional[float] = Field(
+        default=0.0,
+        alias="LLM_JUDGE_TEMPERATURE",
+        description="Temperature sent on judge calls. Set to null (e.g. programmatically, "
+        "not via .env) to omit the parameter entirely - some models (e.g. reasoning-effort-"
+        "tuned models) reject or ignore it. Defaults to 0.0, preserving prior behavior.",
+    )
+    judge_reasoning_effort: Optional[str] = Field(
+        default=None,
+        alias="LLM_JUDGE_REASONING_EFFORT",
+        description="Reasoning effort sent on judge calls via extra_body, for models that "
+        "support it (e.g. 'low'/'minimal'/'none' on reasoning-effort-tuned models). None "
+        "omits the parameter entirely - the default, since most judge models don't use it.",
+    )
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 

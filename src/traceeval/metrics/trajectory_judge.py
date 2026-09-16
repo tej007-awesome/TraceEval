@@ -322,15 +322,25 @@ Return your evaluation as a valid JSON object with EXACTLY these keys:
 "intent_satisfaction", "functional_correctness", "trajectory_quality", "cost_efficiency", "safety_and_rai", and "reasoning".
 """
 
-    response = await client.chat.completions.create(
+    create_kwargs = dict(
         model=settings.llm_model_name,
         messages=[
             {"role": "system", "content": "You are a strict JSON-only evaluation judge. Output only valid JSON."},
             {"role": "user", "content": prompt},
         ],
         response_format={"type": "json_object"},
-        temperature=0.0,
     )
+    # Omit temperature entirely when None - some models (e.g. reasoning-effort-tuned models)
+    # reject or ignore it. Defaults to 0.0, preserving prior hardcoded behavior.
+    if settings.judge_temperature is not None:
+        create_kwargs["temperature"] = settings.judge_temperature
+    # reasoning_effort isn't a standard chat.completions.create() parameter - pass it via
+    # extra_body for models/providers that support it. Omitted (the default) for models that
+    # don't recognize it.
+    if settings.judge_reasoning_effort is not None:
+        create_kwargs["extra_body"] = {"reasoning_effort": settings.judge_reasoning_effort}
+
+    response = await client.chat.completions.create(**create_kwargs)
 
     if not response.choices:
         raise ValueError(
