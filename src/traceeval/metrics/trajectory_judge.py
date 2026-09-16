@@ -1,13 +1,17 @@
-from typing import List
+import re
+from typing import Any, Dict, List, Tuple
 
 from traceeval.core.config import get_judge_client, settings
 from traceeval.core.logger import logger
 from traceeval.core.schema import (
     AgentTrace,
+    ArgMatchMode,
     CheckResult,
     EDDTestCase,
     EvaluationDimensionScore,
     EvaluationResult,
+    FailureCode,
+    FailureReason,
     ToolCall,
     TrajectoryMode,
 )
@@ -22,6 +26,89 @@ def _fmt_tool(tc: ToolCall) -> str:
     return f"{tc.tool_name}({args_str})"
 
 
+def _field_matches(mode: ArgMatchMode, key: str, expected_val: Any, actual_args: Dict[str, Any]) -> bool:
+    if mode == ArgMatchMode.ANY:
+        return key in actual_args
+    if key not in actual_args:
+        return False
+    if mode in (ArgMatchMode.EXACT, ArgMatchMode.SUBSET):
+        return actual_args[key] == expected_val
+    if mode == ArgMatchMode.REGEX:
+        return re.search(str(expected_val), str(actual_args[key])) is not None
+    raise ValueError(f"unknown arg match mode: {mode}")
+
+
+def _tool_matches(expected: ToolCall, actual: ToolCall) -> bool:
+    if expected.tool_name != actual.tool_name:
+        return False
+    mode = getattr(expected, "arg_match_mode", ArgMatchMode.EXACT)
+    overrides = getattr(expected, "field_overrides", {})
+    if mode == ArgMatchMode.EXACT:
+        # Call-level EXACT is always key-set-strict, regardless of field_overrides: extra
+        # actual keys fail even if every listed field's override mode would have matched.
+        if set(actual.args.keys()) != set(expected.args.keys()):
+            return False
+        if not overrides:
+            return expected.args == actual.args  # identical fast path to the old `==`
+    # SUBSET / REGEX / ANY (call-level), or EXACT-with-overrides past the key-set check:
+    # only expected's listed keys are checked, so extra unlisted actual keys are allowed.
+    for key, val in expected.args.items():
+        if not _field_matches(overrides.get(key, mode), key, val, actual.args):
+            return False
+    return True
+
+
+def _classify_miss(
+    expected_tc: ToolCall,
+    unconsumed: List[Tuple[int, ToolCall]],
+    expected_idx: int,
+    absent_code: FailureCode,
+    message: str,
+) -> FailureReason:
+    """Classify why `expected_tc` has no match, considering only UNCONSUMED actual calls
+    (i.e. calls not already matched to some other expected call) so an actual call that
+    already satisfied an earlier expectation isn't double-counted as an arg mismatch here."""
+    for a_idx, a in unconsumed:
+        if a.tool_name == expected_tc.tool_name:
+            return FailureReason(
+                code=FailureCode.ARG_MISMATCH,
+                message=message,
+                step_index=a_idx,
+                expected_index=expected_idx,
+                span_id=a.span_id,
+                expected=expected_tc.args,
+                actual=a.args,
+            )
+    return FailureReason(
+        code=absent_code,
+        message=message,
+        expected_index=expected_idx,
+        expected=_fmt_tool(expected_tc),
+    )
+
+
+def _max_bipartite_match(expected: List[ToolCall], actual: List[ToolCall]) -> Dict[int, int]:
+    """Maximum-cardinality matching expected_idx -> actual_idx via _tool_matches edges
+    (Kuhn's algorithm). Needed because flexible arg-match modes let one actual call satisfy
+    multiple expected calls, so greedy left-to-right assignment can pick the wrong pairing."""
+    match_actual_to_expected: Dict[int, int] = {}
+
+    def try_assign(e_idx: int, visited: set) -> bool:
+        for a_idx, a in enumerate(actual):
+            if a_idx in visited or not _tool_matches(expected[e_idx], a):
+                continue
+            visited.add(a_idx)
+            if a_idx not in match_actual_to_expected or try_assign(match_actual_to_expected[a_idx], visited):
+                match_actual_to_expected[a_idx] = e_idx
+                return True
+        return False
+
+    for e_idx in range(len(expected)):
+        try_assign(e_idx, set())
+
+    return {e_idx: a_idx for a_idx, e_idx in match_actual_to_expected.items()}
+
+
 def validate_trajectory(
     expected: List[ToolCall],
     actual: List[ToolCall],
@@ -32,54 +119,110 @@ def validate_trajectory(
 
     if mode == TrajectoryMode.EXACT:
         if len(expected) != len(actual):
+            msg = f"expected {len(expected)} tool calls, got {len(actual)}"
             return CheckResult(
                 passed=False,
-                reasons=[f"expected {len(expected)} tool calls, got {len(actual)}"],
+                reasons=[msg],
+                reason_details=[FailureReason(code=FailureCode.TRAJECTORY_LENGTH_MISMATCH, message=msg,
+                                               expected=len(expected), actual=len(actual))],
             )
-        reasons = [
-            f"step {i}: expected {_fmt_tool(e)}, got {_fmt_tool(a)}"
-            for i, (e, a) in enumerate(zip(expected, actual))
-            if e != a
-        ]
-        return CheckResult(passed=not reasons, reasons=reasons)
+        reasons: List[str] = []
+        reason_details: List[FailureReason] = []
+        for i, (e, a) in enumerate(zip(expected, actual)):
+            if _tool_matches(e, a):
+                continue
+            msg = f"step {i}: expected {_fmt_tool(e)}, got {_fmt_tool(a)}"
+            reasons.append(msg)
+            if e.tool_name == a.tool_name:
+                reason_details.append(FailureReason(
+                    code=FailureCode.ARG_MISMATCH, message=msg, step_index=i, expected_index=i,
+                    span_id=a.span_id, expected=e.args, actual=a.args,
+                ))
+            else:
+                reason_details.append(FailureReason(
+                    code=FailureCode.TRAJECTORY_STEP_MISMATCH, message=msg, step_index=i, expected_index=i,
+                    span_id=a.span_id,
+                    expected={"tool_name": e.tool_name, "args": e.args},
+                    actual={"tool_name": a.tool_name, "args": a.args},
+                ))
+        return CheckResult(passed=not reasons, reasons=reasons, reason_details=reason_details)
 
     elif mode == TrajectoryMode.IN_ORDER:
         expected_idx = 0
-        for tool in actual:
-            if expected_idx < len(expected) and tool == expected[expected_idx]:
+        consumed_actual_indices = set()
+        for a_idx, tool in enumerate(actual):
+            if expected_idx < len(expected) and _tool_matches(expected[expected_idx], tool):
+                consumed_actual_indices.add(a_idx)
                 expected_idx += 1
+        unconsumed = [(idx, a) for idx, a in enumerate(actual) if idx not in consumed_actual_indices]
+
         reasons = []
+        reason_details = []
         for rank, i in enumerate(range(expected_idx, len(expected))):
             exp_tool = expected[i]
-            present_anywhere = exp_tool in actual
+            matched_actual_idx = next((idx for idx, a in enumerate(actual) if _tool_matches(exp_tool, a)), None)
+            present_anywhere = matched_actual_idx is not None
             if rank == 0:
                 # First unmatched: always report; distinguish absent vs wrong order.
                 if present_anywhere:
-                    reasons.append(
-                        f"expected {_fmt_tool(exp_tool)} at position {i} was called out of order"
-                    )
+                    msg = f"expected {_fmt_tool(exp_tool)} at position {i} was called out of order"
+                    reasons.append(msg)
+                    reason_details.append(FailureReason(
+                        code=FailureCode.TOOL_CALL_OUT_OF_ORDER, message=msg,
+                        step_index=matched_actual_idx, expected_index=i,
+                    ))
                 else:
-                    reasons.append(
-                        f"expected {_fmt_tool(exp_tool)} at position {i} was never called"
-                    )
+                    msg = f"expected {_fmt_tool(exp_tool)} at position {i} was never called"
+                    reasons.append(msg)
+                    reason_details.append(_classify_miss(exp_tool, unconsumed, i, FailureCode.TOOL_CALL_NEVER_CALLED, msg))
             elif not present_anywhere:
                 # Later unmatched: only report when genuinely absent from the trace.
-                reasons.append(
-                    f"expected {_fmt_tool(exp_tool)} at position {i} was never called"
-                )
-        return CheckResult(passed=not reasons, reasons=reasons)
+                msg = f"expected {_fmt_tool(exp_tool)} at position {i} was never called"
+                reasons.append(msg)
+                reason_details.append(_classify_miss(exp_tool, unconsumed, i, FailureCode.TOOL_CALL_NEVER_CALLED, msg))
+        return CheckResult(passed=not reasons, reasons=reasons, reason_details=reason_details)
 
     elif mode == TrajectoryMode.ANY_ORDER:
-        actual_copy = list(actual)
+        matching = _max_bipartite_match(expected, actual)  # expected_idx -> actual_idx
+        matched_actual_indices = set(matching.values())
+        unconsumed = [(idx, a) for idx, a in enumerate(actual) if idx not in matched_actual_indices]
+
         reasons = []
-        for exp_tool in expected:
-            if exp_tool in actual_copy:
-                actual_copy.remove(exp_tool)
-            else:
-                reasons.append(f"expected call {_fmt_tool(exp_tool)} not found in trace")
-        return CheckResult(passed=not reasons, reasons=reasons)
+        reason_details = []
+        for i, exp_tool in enumerate(expected):
+            if i in matching:
+                continue
+            msg = f"expected call {_fmt_tool(exp_tool)} not found in trace"
+            reasons.append(msg)
+            reason_details.append(_classify_miss(exp_tool, unconsumed, i, FailureCode.TOOL_CALL_NOT_FOUND, msg))
+        return CheckResult(passed=not reasons, reasons=reasons, reason_details=reason_details)
 
     return CheckResult(passed=False, reasons=["unknown trajectory mode"])
+
+
+def validate_forbidden_tools(actual: List[ToolCall], case: EDDTestCase) -> CheckResult:
+    reasons: List[str] = []
+    reason_details: List[FailureReason] = []
+    for i, tc in enumerate(actual):
+        if tc.tool_name in case.forbidden_tools:
+            msg = f"step {i}: forbidden tool '{tc.tool_name}' was called"
+            reasons.append(msg)
+            reason_details.append(FailureReason(
+                code=FailureCode.FORBIDDEN_TOOL_CALLED, message=msg,
+                step_index=i, span_id=tc.span_id, actual=_fmt_tool(tc),
+            ))
+            continue
+        for ruleset in case.forbidden_args.get(tc.tool_name, []):
+            if all(k in tc.args and re.search(p, str(tc.args[k])) for k, p in ruleset.items()):
+                matched = ", ".join(f"{k}={tc.args[k]!r}" for k in ruleset)
+                msg = f"step {i}: tool '{tc.tool_name}' called with forbidden args ({matched})"
+                reasons.append(msg)
+                reason_details.append(FailureReason(
+                    code=FailureCode.FORBIDDEN_ARGS, message=msg,
+                    step_index=i, span_id=tc.span_id, expected=ruleset, actual=tc.args,
+                ))
+                break
+    return CheckResult(passed=not reasons, reasons=reasons, reason_details=reason_details)
 
 
 def validate_system_constraints(
@@ -91,21 +234,30 @@ def validate_system_constraints(
         f"Checking system constraints (Max Cost budget: ${max_cost:.4f}, "
         f"Actual Cost: ${trace.total_token_cost_usd:.4f})..."
     )
-    reasons = []
+    reasons: List[str] = []
+    reason_details: List[FailureReason] = []
 
     if not trace.cost_complete:
-        reasons.append("cost could not be verified: pricing missing for one or more models")
+        msg = "cost could not be verified: pricing missing for one or more models"
+        reasons.append(msg)
+        reason_details.append(FailureReason(code=FailureCode.COST_INCOMPLETE, message=msg))
 
     if trace.total_token_cost_usd > max_cost:
-        reasons.append(
-            f"cost ${trace.total_token_cost_usd:.4f} exceeds budget ${max_cost:.4f}"
-        )
+        msg = f"cost ${trace.total_token_cost_usd:.4f} exceeds budget ${max_cost:.4f}"
+        reasons.append(msg)
+        reason_details.append(FailureReason(
+            code=FailureCode.COST_EXCEEDED, message=msg,
+            expected=max_cost, actual=trace.total_token_cost_usd,
+        ))
 
     if case.expected_skill is not None and case.expected_skill not in trace.triggered_skills:
         triggered = ", ".join(trace.triggered_skills) if trace.triggered_skills else "none"
-        reasons.append(
-            f"expected skill '{case.expected_skill}' not triggered (triggered: [{triggered}])"
-        )
+        msg = f"expected skill '{case.expected_skill}' not triggered (triggered: [{triggered}])"
+        reasons.append(msg)
+        reason_details.append(FailureReason(
+            code=FailureCode.SKILL_NOT_TRIGGERED, message=msg,
+            expected=case.expected_skill, actual=trace.triggered_skills,
+        ))
 
     if reasons:
         for r in reasons:
@@ -113,7 +265,7 @@ def validate_system_constraints(
     else:
         logger.info("System constraints checks PASSED.")
 
-    return CheckResult(passed=not reasons, reasons=reasons)
+    return CheckResult(passed=not reasons, reasons=reasons, reason_details=reason_details)
 
 
 async def evaluate_dimensions(
@@ -209,8 +361,22 @@ async def run_evaluation(
         max_cost=max_cost,
     )
 
-    failures = trajectory_check.reasons + constraints_check.reasons
-    passed = trajectory_check.passed and constraints_check.passed
+    forbidden_check = validate_forbidden_tools(actual=trace.executed_tools, case=case)
+
+    # Plain-string list: unchanged concatenation order (backward compatible with existing
+    # positional/ordering assumptions in callers and tests).
+    failures = trajectory_check.reasons + constraints_check.reasons + forbidden_check.reasons
+
+    # Structured list: forbidden-tool/arg violations are the primary, most actionable cause
+    # (a security-relevant denial), so they're surfaced first here even though `failures`
+    # above intentionally keeps its original order.
+    failure_details = (
+        forbidden_check.reason_details
+        + trajectory_check.reason_details
+        + constraints_check.reason_details
+    )
+
+    passed = trajectory_check.passed and constraints_check.passed and forbidden_check.passed
 
     if not passed:
         logger.warning("Deterministic constraints failed. Short-circuiting LLM evaluation.")
@@ -228,6 +394,7 @@ async def run_evaluation(
             scores=empty_scores,
             trace_summary=trace,
             failures=failures,
+            failure_details=failure_details,
         )
 
     logger.info(f"Deterministic checks passed. Triggering semantic evaluation via {settings.llm_model_name}...")
@@ -260,4 +427,5 @@ async def run_evaluation(
         scores=scores,
         trace_summary=trace,
         failures=failures,
+        failure_details=failure_details,
     )
