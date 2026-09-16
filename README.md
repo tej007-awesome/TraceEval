@@ -30,6 +30,8 @@ Every failure explains itself, for example:
 - **Three trace sources:** TraceEval JSON traces, OpenTelemetry GenAI traces, or a live Python agent function run in-process
 - **OpenTelemetry ingestion:** reads OTel GenAI semantic-convention spans directly, with no OpenTelemetry runtime dependency
 - **Computed cost:** from OTel token usage × a pricing table; unknown model pricing fails the budget check instead of reporting $0
+- **Flexible argument matching:** exact, subset, regex, or presence-only, set per call or per field
+- **Forbidden tools:** fail the case if a denied tool is called at all, or called with specific arguments
 - **Specific failure reasons** for every deterministic and semantic failure
 - **Bring your own judge:** any OpenAI-compatible endpoint, including OpenAI, OpenRouter, vLLM, and Ollama
 - **CI-friendly:** exit code 1 on failure, plus JSON export of results
@@ -126,7 +128,62 @@ Case ID: refund_001
 | `IN_ORDER` | These calls appear in this order; other calls may occur in between |
 | `ANY_ORDER` | All these calls appear, in any order; other calls may occur |
 
-Tool arguments are currently matched exactly.
+## Argument matching
+
+Each entry in `expected_tool_calls` can set `arg_match_mode` to control how its `args` are
+compared against the actual call. The default, `EXACT`, preserves the original all-or-nothing
+behavior.
+
+| Mode | Passes when |
+|---|---|
+| `EXACT` (default) | The actual args have exactly the same keys as expected, with equal values |
+| `SUBSET` | Every expected key is present with an equal value; extra actual keys are allowed |
+| `REGEX` | Every expected key is present and its value, stringified, matches the expected value as a regex pattern (`re.search`, so anchor with `^...$` for a full match) |
+| `ANY` | Every expected key is merely present; its value is ignored |
+
+Only `EXACT` requires the actual args to have exactly the expected keys and no more.
+`SUBSET`/`REGEX`/`ANY` all allow extra, unlisted actual keys.
+
+Individual fields can override the call's mode with `field_overrides` (a map of arg name to
+mode). Note that `EXACT` stays key-set-strict even when a field is overridden — an extra actual
+key still fails the call, even if the overridden field's own comparison would have matched:
+
+```json
+{
+  "tool_name": "check_duplicate_charge",
+  "args": { "order_id": "4521", "session_token": "^sess_[a-f0-9]{8}$" },
+  "arg_match_mode": "EXACT",
+  "field_overrides": { "session_token": "REGEX" }
+}
+```
+
+`REGEX` mode stringifies non-string actual values before matching (`str(value)`), so a boolean
+becomes the literal string `"True"`/`"False"` and a dict or list becomes its Python `repr()`-like
+string form — write patterns with that in mind for non-string fields.
+
+## Forbidden tools
+
+A test case can declare tools that must never appear anywhere in the trajectory, and arg patterns
+that make an otherwise-allowed tool forbidden under specific conditions:
+
+```json
+{
+  "forbidden_tools": ["delete_account", "wire_transfer"],
+  "forbidden_args": {
+    "issue_refund": [
+      { "amount": "unlimited" },
+      { "currency": "^(RUB|KPW)$" }
+    ]
+  }
+}
+```
+
+`forbidden_args` maps a tool name to a list of rule-sets; a call is forbidden if **all** patterns
+in **any one** rule-set match (rule-sets are OR'd, patterns within a rule-set are AND'd). A tool
+name cannot appear in both `expected_tool_calls` and `forbidden_tools` — that's a
+self-contradictory test case and is rejected when the file is loaded, not when it's evaluated.
+Any forbidden-tool or forbidden-args hit is a deterministic gate-1 failure: it's checked with zero
+LLM calls and short-circuits the semantic gate exactly like a trajectory or cost failure does.
 
 ## Evaluating OpenTelemetry traces
 
@@ -164,12 +221,12 @@ If any model in the trace has no price, the budget check **fails** with "cost co
 
 ### Privacy-redacted traces
 
-Many OTel instrumentations don't record tool arguments or message content by default. TraceEval still loads these traces and prints a warning, but the missing arguments are treated as empty, so exact argument matching will fail. Flexible argument matching is planned (see Roadmap).
+Many OTel instrumentations don't record tool arguments or message content by default. TraceEval still loads these traces and prints a warning, but the missing arguments are treated as empty, so `EXACT` argument matching will fail. Use `SUBSET` or `ANY` mode on the affected calls if the redacted arguments aren't essential to the check.
 
 ## Limitations
 
-- Tool arguments are matched exactly.
-- `IN_ORDER` and `ANY_ORDER` allow extra tool calls, so they won't catch an unexpected dangerous call. Use `EXACT`, or wait for forbidden-tool support.
+- `SUBSET`/`REGEX` argument matching only inspects the top level of an arg's value; a nested dict or list is compared as a whole (via equality for `SUBSET`, stringified for `REGEX`), not recursively.
+- `IN_ORDER` and `ANY_ORDER` allow extra tool calls, so they won't catch an unexpected dangerous call by themselves — pair them with `forbidden_tools`/`forbidden_args`, or use `EXACT`.
 - The judge makes a single call per case, with no multi-sample aggregation yet.
 - JSON traces report their own cost. Only OTel traces have computed cost.
 - The bundled benchmark in `test_suite/` is small and synthetic.
@@ -180,7 +237,6 @@ Established tools cover much of this space and do more. [DeepEval](https://githu
 
 ## Roadmap
 
-- **Flexible argument matching and forbidden tools:** match arguments exactly, partially, or not at all, and fail any trajectory that calls a denied tool ([#5](https://github.com/tej007-awesome/TraceEval/issues/5))
 - **More reliable LLM judge:** per-rubric verdicts, multiple samples, retries, and an offline mock judge for CI ([#6](https://github.com/tej007-awesome/TraceEval/issues/6))
 - **Meta-evaluation benchmark:** a labelled set of good and bad traces that measures how accurately TraceEval catches failures ([#7](https://github.com/tej007-awesome/TraceEval/issues/7))
 

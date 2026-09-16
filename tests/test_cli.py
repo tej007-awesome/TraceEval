@@ -113,3 +113,116 @@ def test_cli_otel_no_args_warnings_printed(mock_get_client, monkeypatch):
     # refund_no_args has empty args so trajectory validation fails (or warnings print)
     assert "Warning: tool arguments not captured in trace" in res.stdout
     assert "Warning: final output not captured in trace" in res.stdout
+
+
+def _write_case_and_trace(tmp_path, case: dict, trace: dict):
+    case_path = tmp_path / "case.json"
+    case_path.write_text(json.dumps(case), encoding="utf-8")
+    trace_path = tmp_path / "trace.json"
+    trace_path.write_text(json.dumps(trace), encoding="utf-8")
+    return case_path, trace_path
+
+
+def test_cli_forbidden_tool_called_prints_failure_reason(tmp_path, monkeypatch):
+    monkeypatch.setenv("OPENAI_API_KEY", "mock-key")
+    case = {
+        "case_id": "c1",
+        "input_prompt": "p",
+        "expected_tool_calls": [],
+        "forbidden_tools": ["delete_account"],
+        "rubric": ["r"],
+    }
+    trace = {
+        "session_id": "s1",
+        "triggered_skills": [],
+        "executed_tools": [{"tool_name": "delete_account", "args": {"user_id": "1"}}],
+        "final_output": "done",
+        "total_token_cost_usd": 0.01,
+    }
+    case_path, trace_path = _write_case_and_trace(tmp_path, case, trace)
+
+    res = runner.invoke(app, ["run", "--case", str(case_path), "--trace", str(trace_path)])
+    assert res.exit_code == 1
+    assert "Failure Reasons:" in res.stdout
+    assert "forbidden tool 'delete_account'" in res.stdout
+
+
+def test_cli_forbidden_args_prints_failure_reason(tmp_path, monkeypatch):
+    monkeypatch.setenv("OPENAI_API_KEY", "mock-key")
+    case = {
+        "case_id": "c1",
+        "input_prompt": "p",
+        "expected_tool_calls": [],
+        "forbidden_args": {"issue_refund": [{"amount": "^unlimited$"}]},
+        "rubric": ["r"],
+    }
+    trace = {
+        "session_id": "s1",
+        "triggered_skills": [],
+        "executed_tools": [{"tool_name": "issue_refund", "args": {"amount": "unlimited"}}],
+        "final_output": "done",
+        "total_token_cost_usd": 0.01,
+    }
+    case_path, trace_path = _write_case_and_trace(tmp_path, case, trace)
+
+    res = runner.invoke(app, ["run", "--case", str(case_path), "--trace", str(trace_path)])
+    assert res.exit_code == 1
+    assert "Failure Reasons:" in res.stdout
+    assert "forbidden args" in res.stdout
+
+
+def test_cli_arg_mismatch_subset_mode_prints_failure_reason(tmp_path, monkeypatch):
+    monkeypatch.setenv("OPENAI_API_KEY", "mock-key")
+    case = {
+        "case_id": "c1",
+        "input_prompt": "p",
+        "expected_tool_calls": [
+            {"tool_name": "lookup", "args": {"id": "1"}, "arg_match_mode": "SUBSET"}
+        ],
+        "trajectory_mode": "IN_ORDER",
+        "rubric": ["r"],
+    }
+    trace = {
+        "session_id": "s1",
+        "triggered_skills": [],
+        "executed_tools": [{"tool_name": "lookup", "args": {"id": "2", "extra": "x"}}],
+        "final_output": "done",
+        "total_token_cost_usd": 0.01,
+    }
+    case_path, trace_path = _write_case_and_trace(tmp_path, case, trace)
+
+    res = runner.invoke(app, ["run", "--case", str(case_path), "--trace", str(trace_path)])
+    assert res.exit_code == 1
+    assert "Failure Reasons:" in res.stdout
+    assert "was never called" in res.stdout
+
+
+def test_cli_regex_arg_mismatch_prints_failure_reason(tmp_path, monkeypatch):
+    monkeypatch.setenv("OPENAI_API_KEY", "mock-key")
+    case = {
+        "case_id": "c1",
+        "input_prompt": "p",
+        "expected_tool_calls": [
+            {
+                "tool_name": "check",
+                "args": {"token": "^sess_[a-f0-9]{4}$"},
+                "arg_match_mode": "EXACT",
+                "field_overrides": {"token": "REGEX"},
+            }
+        ],
+        "trajectory_mode": "IN_ORDER",
+        "rubric": ["r"],
+    }
+    trace = {
+        "session_id": "s1",
+        "triggered_skills": [],
+        "executed_tools": [{"tool_name": "check", "args": {"token": "bad-token"}}],
+        "final_output": "done",
+        "total_token_cost_usd": 0.01,
+    }
+    case_path, trace_path = _write_case_and_trace(tmp_path, case, trace)
+
+    res = runner.invoke(app, ["run", "--case", str(case_path), "--trace", str(trace_path)])
+    assert res.exit_code == 1
+    assert "Failure Reasons:" in res.stdout
+    assert "was never called" in res.stdout
