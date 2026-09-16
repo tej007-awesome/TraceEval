@@ -174,7 +174,12 @@ def load_otel_trace(
                     )
                     missing_args_warned = True
 
-            executed_tools.append(ToolCall(tool_name=tool_name, args=tool_args))
+            raw_span_id = span.get("spanId")
+            executed_tools.append(ToolCall(
+                tool_name=tool_name,
+                args=tool_args,
+                span_id=str(raw_span_id) if raw_span_id else None,
+            ))
 
         elif op_name == otel_attrs.OPERATION_CHAT:
             model = str(attrs.get(otel_attrs.GEN_AI_REQUEST_MODEL, "unknown_model"))
