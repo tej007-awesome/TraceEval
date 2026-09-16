@@ -69,7 +69,7 @@
       "kind": "rubric_item_ignored",
       "final_output": "I generated type stubs for src.services.auth, analyzed AST for src/services/auth.py, and updated missing type annotations.",
       "expected_passed": false,
-      "expected_dimension": "intent_satisfaction",
+      "expected_dimensions": ["intent_satisfaction", "functional_correctness"],
       "note": "Omits running mypy check on src/services package required by rubric item 1."
     },
     {
@@ -89,7 +89,7 @@
       "kind": "hallucinated_action",
       "final_output": "I ran mypy type check on src/services, generated type stubs for src.services.auth, analyzed the AST for src/services/auth.py, and updated missing type annotations to resolve all 2 mypy errors.",
       "expected_passed": false,
-      "expected_dimension": "functional_correctness",
+      "expected_dimensions": ["functional_correctness", "trajectory_quality"],
       "soft_action_tool": "generate_type_stub",
       "note": "Removes generate_type_stub soft action tool call from executed trace."
     }

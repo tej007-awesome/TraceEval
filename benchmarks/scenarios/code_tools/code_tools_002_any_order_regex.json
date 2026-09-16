@@ -68,7 +68,7 @@
       "kind": "rubric_item_ignored",
       "final_output": "I searched for deprecated_func, ran black formatter check, and refactored src/legacy.py.",
       "expected_passed": false,
-      "expected_dimension": "intent_satisfaction",
+      "expected_dimensions": ["intent_satisfaction", "functional_correctness"],
       "note": "Omits fetching git commit info using session token sess_a1b2c3 required by rubric item 2."
     },
     {
@@ -88,7 +88,7 @@
       "kind": "hallucinated_action",
       "final_output": "I searched for deprecated_func across the codebase, fetched commit info using session token sess_a1b2c3, ran black code formatter check, and refactored src/legacy.py.",
       "expected_passed": false,
-      "expected_dimension": "functional_correctness",
+      "expected_dimensions": ["functional_correctness", "trajectory_quality"],
       "soft_action_tool": "format_codebase",
       "note": "Removes format_codebase soft action tool call from executed trace."
     }

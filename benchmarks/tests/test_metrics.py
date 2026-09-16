@@ -1,4 +1,5 @@
 from benchmarks.metrics import (
+    _is_correct_attribution,
     compute_operator_metrics,
     gate1_share_of_detections,
     judge_error_rate_by_operator,
@@ -107,3 +108,60 @@ def test_judge_error_rate_by_operator_excludes_gate1_benign_and_clean_base():
     benign.expected_gate = "gate1"
     rates = judge_error_rate_by_operator([clean_base, benign])
     assert rates == {}
+
+
+def _gate2_outcome(expected_dimensions, actual_below_threshold_dimensions, actual_dimensions=None):
+    return EvalOutcome(
+        scenario_id="s", domain="refunds", operator="rubric_item_ignored", category="gate2_fault",
+        expected_passed=False, expected_gate="gate2", expected_dimensions=expected_dimensions,
+        actual_passed=False,
+        actual_dimensions=actual_dimensions if actual_dimensions is not None else actual_below_threshold_dimensions,
+        actual_below_threshold_dimensions=actual_below_threshold_dimensions,
+    )
+
+
+def test_attribution_correct_when_any_expected_dimension_matches():
+    o = _gate2_outcome(
+        expected_dimensions=["intent_satisfaction", "functional_correctness"],
+        actual_below_threshold_dimensions=["functional_correctness"],
+    )
+    assert _is_correct_attribution(o) is True
+
+
+def test_attribution_correct_when_first_expected_dimension_matches():
+    o = _gate2_outcome(
+        expected_dimensions=["intent_satisfaction", "functional_correctness"],
+        actual_below_threshold_dimensions=["intent_satisfaction"],
+    )
+    assert _is_correct_attribution(o) is True
+
+
+def test_attribution_incorrect_when_no_expected_dimension_matches():
+    o = _gate2_outcome(
+        expected_dimensions=["intent_satisfaction", "functional_correctness"],
+        actual_below_threshold_dimensions=["safety_and_rai"],
+    )
+    assert _is_correct_attribution(o) is False
+
+
+def test_attribution_ignores_null_dimension_not_in_below_threshold_list():
+    # A dimension that only shows up via JUDGE_NULL_DIMENSION (not JUDGE_BELOW_THRESHOLD)
+    # must NOT count toward attribution correctness, even though it's a "detection" and even
+    # though it appears in the more general actual_dimensions list.
+    o = _gate2_outcome(
+        expected_dimensions=["functional_correctness"],
+        actual_below_threshold_dimensions=[],
+        actual_dimensions=["functional_correctness"],  # only via JUDGE_NULL_DIMENSION in this scenario
+    )
+    assert _is_correct_attribution(o) is False
+
+
+def test_compute_operator_metrics_multi_dimension_attribution_rate():
+    outcomes = [
+        _gate2_outcome(["intent_satisfaction", "functional_correctness"], ["functional_correctness"]),
+        _gate2_outcome(["intent_satisfaction", "functional_correctness"], ["safety_and_rai"]),
+    ]
+    rows = compute_operator_metrics(outcomes)
+    row = rows[0]
+    assert row.detection_rate.point == 1.0  # both are detections (actual_passed=False, expected_passed=False)
+    assert row.code_attribution_rate.point == 0.5  # only the first one's dimension matched

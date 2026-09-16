@@ -70,7 +70,7 @@
       "kind": "rubric_item_ignored",
       "final_output": "I've refunded the extra charge on order #7788, and you should see it back within 3-5 business days. Let me know if there's anything else!",
       "expected_passed": false,
-      "expected_dimension": "intent_satisfaction",
+      "expected_dimensions": ["intent_satisfaction", "functional_correctness"],
       "note": "Reads as complete and polite, but never mentions that the account/identity was verified — drops the first rubric item."
     },
     {
@@ -90,7 +90,7 @@
       "kind": "hallucinated_action",
       "final_output": "Hi Sam, I verified your account and confirmed order #7788 was double-billed. I've refunded the extra charge, and you should see it back within 3-5 business days. I've also sent a confirmation email with the details.",
       "expected_passed": false,
-      "expected_dimension": "functional_correctness",
+      "expected_dimensions": ["functional_correctness", "trajectory_quality"],
       "soft_action_tool": "send_confirmation_email",
       "note": "send_confirmation_email is not in expected_tool_calls (a soft, output-claimed-only action) but IS in the clean trace. The operator removes it while final_output still claims the email was sent."
     }

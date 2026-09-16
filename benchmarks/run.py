@@ -61,6 +61,7 @@ class _TrackedCompletions:
     async def create(self, *args, **kwargs):
         response = await self._inner.create(*args, **kwargs)
         self._tracker["last_usage"] = response.usage
+        self._tracker["last_model"] = getattr(response, "model", None)
         return response
 
 
@@ -70,8 +71,12 @@ class _TrackedChat:
 
 
 class _TrackedClient:
-    """Wraps the real AsyncOpenAI client to capture token usage per call, since
-    evaluate_dimensions/run_evaluation don't expose it on EvaluationResult."""
+    """Wraps the real AsyncOpenAI client to capture token usage and the response's `model`
+    field per call, since evaluate_dimensions/run_evaluation don't expose either on
+    EvaluationResult. The returned `model` is recorded separately from the requested model
+    ID in the report - OpenRouter (this repo's configured provider) echoes back the model
+    alias, not the dated snapshot that was actually requested, so exact snapshot pinning
+    can't be fully verified from the response alone."""
 
     def __init__(self, inner_client, tracker: dict):
         self.chat = _TrackedChat(inner_client.chat, tracker)
@@ -87,6 +92,10 @@ async def _sentinel_judge(trace, case):
 def _outcome_from_result(result, scenario_id, domain, operator, category, expected, k, latency_ms, cost_usd, retries, from_cache) -> EvalOutcome:
     codes = [fd.code.value for fd in result.failure_details]
     dims = [fd.dimension for fd in result.failure_details if fd.dimension]
+    below_threshold_dims = [
+        fd.dimension for fd in result.failure_details
+        if fd.code == FailureCode.JUDGE_BELOW_THRESHOLD and fd.dimension
+    ]
     is_judge_error = FailureCode.JUDGE_ERROR.value in codes
     sentinel_triggered = is_judge_error and any(
         "SENTINEL" in (fd.message or "") for fd in result.failure_details
@@ -94,9 +103,10 @@ def _outcome_from_result(result, scenario_id, domain, operator, category, expect
     return EvalOutcome(
         scenario_id=scenario_id, domain=domain, operator=operator, category=category, k=k,
         expected_passed=expected.expected_passed, expected_gate=expected.expected_gate,
-        expected_code=expected.expected_code, expected_dimension=expected.expected_dimension,
+        expected_code=expected.expected_code, expected_dimensions=expected.expected_dimensions,
         label=expected.label,
         actual_passed=result.passed, actual_codes=codes, actual_dimensions=dims,
+        actual_below_threshold_dimensions=below_threshold_dims,
         is_judge_error=is_judge_error, sentinel_triggered=sentinel_triggered, retries=retries,
         latency_ms=latency_ms, cost_usd=cost_usd, from_cache=from_cache,
     )
@@ -118,7 +128,7 @@ def _outcome_for_gate1_decidable(result, scenario_id, domain, operator, category
     return EvalOutcome(
         scenario_id=scenario_id, domain=domain, operator=operator, category=category, k=0,
         expected_passed=expected.expected_passed, expected_gate=expected.expected_gate,
-        expected_code=expected.expected_code, expected_dimension=expected.expected_dimension,
+        expected_code=expected.expected_code, expected_dimensions=expected.expected_dimensions,
         label=expected.label,
         actual_passed=actual_passed, actual_codes=actual_codes, actual_dimensions=dims,
         is_judge_error=False, sentinel_triggered=sentinel_triggered, retries=0,
@@ -203,12 +213,13 @@ async def run_judge_mode(
     cache_dir: Path,
     use_cache: bool,
     pricing: dict,
-) -> tuple[List[EvalOutcome], bool]:
+) -> tuple[List[EvalOutcome], bool, List[str]]:
     import traceeval.core.config as config_module
     import traceeval.metrics.trajectory_judge as tj
 
     cache = JudgeCache(cache_dir)
-    tracker: dict = {"last_usage": None}
+    tracker: dict = {"last_usage": None, "last_model": None}
+    returned_models: set = set()
     real_get_client = config_module.get_judge_client
     original_settings_model = config_module.settings.llm_model_name
     original_settings_temperature = config_module.settings.judge_temperature
@@ -257,9 +268,13 @@ async def run_judge_mode(
                         continue
 
                     tracker["last_usage"] = None
+                    tracker["last_model"] = None
                     start = time.monotonic()
                     result, attempts = await _run_with_retries(r.mutated_case, r.mutated_trace, 0.10, 0.8, max_attempts=3)
                     latency_ms = (time.monotonic() - start) * 1000
+
+                    if tracker["last_model"]:
+                        returned_models.add(tracker["last_model"])
 
                     cost_usd = 0.0
                     if tracker["last_usage"] is not None:
@@ -289,7 +304,7 @@ async def run_judge_mode(
         config_module.settings.judge_temperature = original_settings_temperature
         config_module.settings.judge_reasoning_effort = original_settings_reasoning
 
-    return outcomes, cost_cap_hit
+    return outcomes, cost_cap_hit, sorted(returned_models)
 
 
 def main():
@@ -297,20 +312,19 @@ def main():
     parser.add_argument("--scenarios-dir", type=Path, default=Path("benchmarks/scenarios"))
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--gate1-only", action="store_true")
+    parser.add_argument("--limit", type=int, default=None, help="Only run the first N scenarios (sorted by path) - for pilots.")
     parser.add_argument("--k", type=int, default=3)
     # Dated snapshot (not the alias), per OpenRouter's public /models catalog
-    # (canonical_slug "openai/gpt-5.6-luna-20260709", verified 2026-09-16). This is the
-    # model string that works through THIS repo's configured LLM_BASE_URL (OpenRouter);
-    # direct-OpenAI users should override with OpenAI's own dated snapshot ID.
+    # (canonical_slug "openai/gpt-5.6-luna-20260709"). This is the model string that works
+    # through THIS repo's configured LLM_BASE_URL (OpenRouter); direct-OpenAI users should
+    # override with OpenAI's own dated snapshot ID. Note: OpenRouter echoes back the alias
+    # in response.model, not this dated string - see returned_model_ids in the report.
     parser.add_argument("--judge-model", type=str, default="openai/gpt-5.6-luna-20260709")
-    # gpt-5.6-luna's supported_parameters (per OpenRouter's catalog) do not list
-    # "temperature" (default_parameters.temperature is null) - NOT verified by a live call
-    # (see PR discussion: the configured judge account has zero credits). Default to
-    # omitting it; pass --judge-temperature to force a value if your provider needs one.
-    parser.add_argument("--judge-temperature", type=float, default=None)
-    # Lowest of gpt-5.6-luna's supported_efforts (max/xhigh/high/medium/low/none), per the
-    # same catalog metadata - configurable since "none" may be too little reasoning for some
-    # judge tasks; this is a cost-conscious default, not a quality-verified one.
+    # Verified live (see PR discussion): temperature=0.0 is accepted by gpt-5.6-luna via
+    # OpenRouter. Defaulting to 0.0 for deterministic, low-variance judge output.
+    parser.add_argument("--judge-temperature", type=float, default=0.0)
+    # Lowest of gpt-5.6-luna's supported_efforts (max/xhigh/high/medium/low/none). Verified
+    # live: "none" is honoured (accepted and changes behavior, not silently ignored).
     parser.add_argument("--reasoning-effort", type=str, default="none")
     parser.add_argument("--max-total-cost-usd", type=float, default=None)
     parser.add_argument("--cache-dir", type=Path, default=DEFAULT_CACHE_DIR)
@@ -322,13 +336,16 @@ def main():
     if not scenarios:
         print(f"No scenarios found under {args.scenarios_dir}", file=sys.stderr)
         sys.exit(1)
+    if args.limit is not None:
+        scenarios = scenarios[: args.limit]
 
     cost_cap_hit = False
+    returned_model_ids: List[str] = []
     if args.gate1_only:
         outcomes = asyncio.run(run_gate1_only(scenarios, args.seed))
     else:
         pricing = dict(DEFAULT_PRICING)
-        outcomes, cost_cap_hit = asyncio.run(run_judge_mode(
+        outcomes, cost_cap_hit, returned_model_ids = asyncio.run(run_judge_mode(
             scenarios, args.seed, args.k, args.judge_model, args.judge_temperature, args.reasoning_effort,
             args.max_total_cost_usd, args.cache_dir, use_cache=not args.no_cache, pricing=pricing,
         ))
@@ -341,7 +358,14 @@ def main():
             "seed": args.seed,
             "gate1_only": args.gate1_only,
             "k": 0 if args.gate1_only else args.k,
-            "judge_model": None if args.gate1_only else args.judge_model,
+            "requested_judge_model": None if args.gate1_only else args.judge_model,
+            "returned_model_ids": returned_model_ids,
+            "returned_model_ids_note": (
+                None if args.gate1_only else
+                "OpenRouter echoes back the model alias in each response, not the dated "
+                "snapshot that was actually requested - exact snapshot pinning can't be "
+                "fully verified from the response alone."
+            ),
             "judge_temperature": None if args.gate1_only else args.judge_temperature,
             "reasoning_effort": None if args.gate1_only else args.reasoning_effort,
             "n_scenarios": len(scenarios),

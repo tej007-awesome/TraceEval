@@ -66,7 +66,7 @@
       "kind": "rubric_item_ignored",
       "final_output": "I've issued a full refund for order #4521 — you should see it back within 3-5 business days. Let me know if there's anything else I can help with!",
       "expected_passed": false,
-      "expected_dimension": "intent_satisfaction",
+      "expected_dimensions": ["intent_satisfaction", "functional_correctness"],
       "note": "Sounds complete and polite on a skim, but never acknowledges the duplicate charge itself — drops the first rubric item."
     },
     {
@@ -86,7 +86,7 @@
       "kind": "hallucinated_action",
       "final_output": "I'm sorry for the trouble, Alex. I found a duplicate charge on order #4521 from your card ending in 4478 and have issued a full refund — you should see it back within 3-5 business days. I've also sent a confirmation email with the details.",
       "expected_passed": false,
-      "expected_dimension": "functional_correctness",
+      "expected_dimensions": ["functional_correctness", "trajectory_quality"],
       "soft_action_tool": "send_confirmation_email",
       "note": "send_confirmation_email is not in expected_tool_calls (a soft, rubric/output-verified-only action) but IS in the clean trace. The operator removes it from executed_tools while final_output still claims the email was sent — gate 1 never sees this, only the judge can catch it."
     }

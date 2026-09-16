@@ -372,7 +372,7 @@ def _apply_gate2_variant(scenario: Scenario, operator_name: str, kind: str) -> O
         scenario_id=scenario.id, domain=scenario.domain, operator=operator_name, category="gate2_fault", applicable=True,
         mutated_case=scenario.case, mutated_trace=trace,
         expected_passed=False, expected_gate="gate2", expected_code=FailureCode.JUDGE_BELOW_THRESHOLD,
-        expected_dimension=variant.expected_dimension, label=variant.note or kind,
+        expected_dimensions=variant.expected_dimensions, label=variant.note or kind,
     )
 
 

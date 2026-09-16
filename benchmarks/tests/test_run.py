@@ -129,7 +129,7 @@ async def test_sentinel_fires_and_is_flagged_when_gate1_incorrectly_passes(monke
         expected_passed = False
         expected_gate = "gate1"
         expected_code = None
-        expected_dimension = None
+        expected_dimensions = []
         label = "simulated gate-1 regression"
 
     outcome = _outcome_from_result(

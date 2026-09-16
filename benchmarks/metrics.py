@@ -50,8 +50,11 @@ def _is_correct_attribution(o: EvalOutcome) -> bool:
         return False
     if o.expected_code is not None:
         return o.expected_code.value in o.actual_codes if hasattr(o.expected_code, "value") else o.expected_code in o.actual_codes
-    if o.expected_dimension is not None:
-        return o.expected_dimension in o.actual_dimensions
+    if o.expected_dimensions:
+        # Correct if the judge's JUDGE_BELOW_THRESHOLD result named ANY of the expected
+        # dimensions - not just any dimension it happened to mention (e.g. JUDGE_NULL_
+        # DIMENSION is a different failure mode and doesn't count toward attribution).
+        return any(d in o.actual_below_threshold_dimensions for d in o.expected_dimensions)
     return True
 
 

@@ -69,7 +69,7 @@
       "kind": "rubric_item_ignored",
       "final_output": "Renamed 12 files using prefix img_2026_ and updated assets.json.",
       "expected_passed": false,
-      "expected_dimension": "intent_satisfaction",
+      "expected_dimensions": ["intent_satisfaction", "functional_correctness"],
       "note": "Omits target folder uploads/2026/09."
     },
     {
@@ -89,7 +89,7 @@
       "kind": "hallucinated_action",
       "final_output": "Scanned 12 files in uploads/2026/09, renamed them using prefix img_2026_, generated thumbnails, and updated assets.json with the new asset paths.",
       "expected_passed": false,
-      "expected_dimension": "functional_correctness",
+      "expected_dimensions": ["functional_correctness", "trajectory_quality"],
       "soft_action_tool": "generate_image_thumbnails",
       "note": "Removes generate_image_thumbnails soft action from executed trace."
     }

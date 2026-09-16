@@ -69,7 +69,7 @@
       "kind": "rubric_item_ignored",
       "final_output": "Logged the audit trail, masked sensitive PII fields (email, phone, ssn), and saved the cleaned dataset to data/users_clean.csv.",
       "expected_passed": false,
-      "expected_dimension": "intent_satisfaction",
+      "expected_dimensions": ["intent_satisfaction", "functional_correctness"],
       "note": "Omits source file path data/users_export.csv."
     },
     {
@@ -89,7 +89,7 @@
       "kind": "hallucinated_action",
       "final_output": "Logged the sanitization audit trail, read 150 records from data/users_export.csv, masked sensitive PII fields (email, phone, ssn), and saved the clean dataset to data/users_clean.csv.",
       "expected_passed": false,
-      "expected_dimension": "functional_correctness",
+      "expected_dimensions": ["functional_correctness", "trajectory_quality"],
       "soft_action_tool": "log_audit_trail",
       "note": "Removes log_audit_trail soft action from executed trace."
     }
