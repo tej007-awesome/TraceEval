@@ -116,7 +116,7 @@ def test_build_review_queue_excludes_holdout_by_default(tmp_path):
     assert "holdout_sc_01" in content_included
 
 
-def test_build_review_queue_excludes_regex_conforming_variable_value(tmp_path):
+def test_build_review_queue_includes_regex_conforming_variable_value(tmp_path):
     payload = {
         "config": {"commit_sha": "abc123", "k": 1, "seed": 0},
         "outcomes": [
@@ -131,5 +131,5 @@ def test_build_review_queue_excludes_regex_conforming_variable_value(tmp_path):
         ]
     }
     content = build_review_queue(payload, tmp_path / "nonexistent", include_holdout=True)
-    assert "Total review groups: 0" in content
-    assert "regex_conforming_variable_value" not in content
+    assert "Total review groups: 1" in content
+    assert "regex_conforming_variable_value" in content
