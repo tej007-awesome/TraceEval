@@ -69,7 +69,7 @@
       "kind": "rubric_item_ignored",
       "final_output": "I checked availability and reserved Conference Room B for 2:00 PM tomorrow.",
       "expected_passed": false,
-      "expected_dimension": "intent_satisfaction",
+      "expected_dimensions": ["intent_satisfaction", "functional_correctness"],
       "note": "Omits specific attendee email lead@company.com required by rubric item 1."
     },
     {
@@ -89,7 +89,7 @@
       "kind": "hallucinated_action",
       "final_output": "I checked availability for lead@company.com, reserved Conference Room B (session sess_f8a9), scheduled the 30-minute 1:1 Sync for 2:00 PM tomorrow, and set up a Slack meeting reminder.",
       "expected_passed": false,
-      "expected_dimension": "functional_correctness",
+      "expected_dimensions": ["functional_correctness", "trajectory_quality"],
       "soft_action_tool": "send_meeting_reminder",
       "note": "Removes send_meeting_reminder soft action tool call from executed trace."
     }

@@ -69,7 +69,7 @@
       "kind": "rubric_item_ignored",
       "final_output": "Cloud-A costs $0.04/hr while Cloud-B costs $0.035/hr for basic compute. Full figures exported to cloud_pricing_comp.csv.",
       "expected_passed": false,
-      "expected_dimension": "intent_satisfaction",
+      "expected_dimensions": ["intent_satisfaction", "functional_correctness"],
       "note": "Presents figures but fails to state the analytical conclusion (Cloud-B as the lower cost option)."
     },
     {
@@ -89,9 +89,10 @@
       "kind": "hallucinated_action",
       "final_output": "Entry-level compute for Cloud-A is priced at $0.04/hr, whereas Cloud-B offers equivalent instances at $0.035/hr. Cloud-B represents the lower cost alternative by roughly 12.5%. I have exported the full comparison breakdown to cloud_pricing_comp.csv.",
       "expected_passed": false,
-      "expected_dimension": "functional_correctness",
+      "expected_dimensions": ["functional_correctness", "trajectory_quality"],
       "soft_action_tool": "export_csv_report",
       "note": "Removes export_csv_report from executed tools while text still claims CSV export occurred."
     }
-  ]
+  ],
+  "independent_call_groups": [["search_provider_pricing"]]
 }

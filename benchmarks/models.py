@@ -7,7 +7,7 @@ generators of new content - see scenarios/AUTHORING.md for the authoring contrac
 """
 from __future__ import annotations
 
-from typing import List, Literal, Optional
+from typing import Dict, List, Literal, Optional
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -38,10 +38,14 @@ class Gate2Variant(BaseModel):
     expected_passed: bool = Field(
         ..., description="True only for paraphrased_but_correct_final_answer (a benign control)."
     )
-    expected_dimension: Optional[str] = Field(
-        None,
-        description="Snake_case EvaluationDimensionScore field this variant should fail on "
-        "(required for fault variants; must be None for paraphrased_but_correct_final_answer).",
+    expected_dimensions: List[str] = Field(
+        default_factory=list,
+        description="Snake_case EvaluationDimensionScore field(s) this variant should fail on "
+        "(required, non-empty for fault variants; must be empty for "
+        "paraphrased_but_correct_final_answer). Attribution succeeds if the judge's "
+        "JUDGE_BELOW_THRESHOLD result names ANY of these dimensions - some variants "
+        "legitimately touch more than one (e.g. rubric_item_ignored can plausibly read as "
+        "either an intent or a correctness miss).",
     )
     soft_action_tool: Optional[str] = Field(
         None,
@@ -53,19 +57,31 @@ class Gate2Variant(BaseModel):
         "", description="Authoring rationale: what fact/rubric item/dimension this targets."
     )
 
+    @model_validator(mode="before")
+    @classmethod
+    def _coerce_singular_dimension(cls, data):
+        # Backward compat: old scenario files use the singular "expected_dimension" string
+        # field. Accept it and normalize to the new expected_dimensions list, so existing
+        # scenario JSON (and any author still following the older convention) keeps loading.
+        if isinstance(data, dict) and "expected_dimension" in data and "expected_dimensions" not in data:
+            data = dict(data)
+            val = data.pop("expected_dimension")
+            data["expected_dimensions"] = [val] if val else []
+        return data
+
     @model_validator(mode="after")
     def _validate_kind_fields(self) -> "Gate2Variant":
         is_paraphrase = self.kind == "paraphrased_but_correct_final_answer"
         if is_paraphrase:
             if not self.expected_passed:
                 raise ValueError("paraphrased_but_correct_final_answer must have expected_passed=True")
-            if self.expected_dimension is not None:
-                raise ValueError("paraphrased_but_correct_final_answer must not set expected_dimension")
+            if self.expected_dimensions:
+                raise ValueError("paraphrased_but_correct_final_answer must not set expected_dimensions")
         else:
             if self.expected_passed:
                 raise ValueError(f"{self.kind} is a fault variant and must have expected_passed=False")
-            if not self.expected_dimension:
-                raise ValueError(f"{self.kind} must set expected_dimension (which dimension it targets)")
+            if not self.expected_dimensions:
+                raise ValueError(f"{self.kind} must set expected_dimensions (which dimension(s) it targets)")
         if self.kind == "hallucinated_action" and not self.soft_action_tool:
             raise ValueError("hallucinated_action must set soft_action_tool")
         if self.kind != "hallucinated_action" and self.soft_action_tool:
@@ -81,6 +97,14 @@ class Scenario(BaseModel):
     case: EDDTestCase
     trace: AgentTrace
     gate2_variants: List[Gate2Variant] = Field(default_factory=list)
+    independent_call_groups: Optional[List[List[str]]] = Field(
+        None,
+        description="Optional groups of tool_names in trace.executed_tools that have no "
+        "causal dependency on each other and can be freely reordered. Only used by the "
+        "reorder_under_any_order benign control, which is inapplicable to a scenario that "
+        "doesn't declare this - blindly shuffling the whole trajectory risks producing an "
+        "order a real agent couldn't actually take (e.g. a step before its prerequisite).",
+    )
 
     @model_validator(mode="after")
     def _validate_soft_action_tools(self) -> "Scenario":
@@ -115,12 +139,37 @@ class EvalOutcome(BaseModel):
     expected_passed: bool
     expected_gate: Optional[Literal["gate1", "gate2"]] = None
     expected_code: Optional[FailureCode] = None
-    expected_dimension: Optional[str] = None
+    expected_dimensions: List[str] = Field(default_factory=list)
     label: str = ""
 
     actual_passed: bool
     actual_codes: List[str] = Field(default_factory=list)
     actual_dimensions: List[str] = Field(default_factory=list)
+    actual_below_threshold_dimensions: List[str] = Field(
+        default_factory=list,
+        description="Dimensions specifically from JUDGE_BELOW_THRESHOLD failures (a subset of "
+        "actual_dimensions, which also includes JUDGE_NULL_DIMENSION) - attribution correctness "
+        "is checked against this narrower list, not any dimension the judge merely mentioned.",
+    )
+    gate1_passed: bool = Field(
+        True,
+        description="Whether gate 1 alone passed - derived from whether any NON-judge "
+        "FailureCode appears in actual_codes. False only when a real gate-1 failure code "
+        "(ARG_MISMATCH, COST_EXCEEDED, etc.) is present, which - per run_evaluation's "
+        "short-circuit - also implies actual_passed=False. True means gate 1 passed and the "
+        "item reached gate 2 for real (whether gate 2 then passed or failed), which is the "
+        "signal used to separate 'Gate-1 FP' from 'Pipeline FP' and to decide whether an "
+        "item's cost/latency/judge-error stats belong in the judge-call aggregates.",
+    )
+    judge_reasoning: Optional[str] = Field(
+        None, description="scores.reasoning from the real judge call, saved only when "
+        "expected_passed != actual_passed (a gate-2 miss or a pipeline false positive), so "
+        "failures can be analysed without re-spending."
+    )
+    actual_scores: Optional[Dict[str, Optional[float]]] = Field(
+        None, description="The judge's per-dimension scores, saved under the same condition "
+        "as judge_reasoning."
+    )
     is_judge_error: bool = False
     sentinel_triggered: bool = False
     retries: int = 0
@@ -146,5 +195,5 @@ class OperatorResult(BaseModel):
     expected_passed: Optional[bool] = None
     expected_gate: Optional[Literal["gate1", "gate2"]] = None
     expected_code: Optional[FailureCode] = None
-    expected_dimension: Optional[str] = None
+    expected_dimensions: List[str] = Field(default_factory=list)
     label: str = ""

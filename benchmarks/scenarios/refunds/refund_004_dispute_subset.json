@@ -68,7 +68,7 @@
       "kind": "rubric_item_ignored",
       "final_output": "The $45.00 dispute credit for your damaged goods claim has been approved and credited to your account. Let us know if you need further assistance!",
       "expected_passed": false,
-      "expected_dimension": "intent_satisfaction",
+      "expected_dimensions": ["intent_satisfaction", "functional_correctness"],
       "note": "Omits explicit mention of dispute ID disp_8820 and merchant account mch_3309."
     },
     {
@@ -88,7 +88,7 @@
       "kind": "hallucinated_action",
       "final_output": "Dispute disp_8820 for merchant account mch_3309 has been reviewed. Since the merchant evidence was insufficient regarding the damaged goods, a $45.00 dispute credit has been approved and issued to your account. I have also notified our dispute operations team of the resolution.",
       "expected_passed": false,
-      "expected_dimension": "functional_correctness",
+      "expected_dimensions": ["functional_correctness", "trajectory_quality"],
       "soft_action_tool": "notify_dispute_team",
       "note": "Removes notify_dispute_team tool call while final output still claims team notification was performed."
     }

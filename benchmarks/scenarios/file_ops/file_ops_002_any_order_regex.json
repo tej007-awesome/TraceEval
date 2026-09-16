@@ -69,7 +69,7 @@
       "kind": "rubric_item_ignored",
       "final_output": "I validated session token sess_a1b2c3 and updated DB_CONNECTION_LIMIT to 50.",
       "expected_passed": false,
-      "expected_dimension": "intent_satisfaction",
+      "expected_dimensions": ["intent_satisfaction", "functional_correctness"],
       "note": "Omits reading config file /etc/config/app.json."
     },
     {
@@ -89,9 +89,10 @@
       "kind": "hallucinated_action",
       "final_output": "I validated session token sess_a1b2c3, inspected /etc/config/app.json, created a backup at /etc/config/app.json.bak, and updated DB_CONNECTION_LIMIT to 50.",
       "expected_passed": false,
-      "expected_dimension": "functional_correctness",
+      "expected_dimensions": ["functional_correctness", "trajectory_quality"],
       "soft_action_tool": "create_backup_copy",
       "note": "Removes create_backup_copy soft action from executed trace."
     }
-  ]
+  ],
+  "independent_call_groups": [["list_directory_files", "rsync_sync_directory"]]
 }

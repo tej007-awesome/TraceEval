@@ -69,7 +69,7 @@
       "kind": "rubric_item_ignored",
       "final_output": "I found a 45-minute overlapping slot at 16:00 UTC and scheduled the Q3 Architecture Review with doc_arch_q3 attached.",
       "expected_passed": false,
-      "expected_dimension": "intent_satisfaction",
+      "expected_dimensions": ["intent_satisfaction", "functional_correctness"],
       "note": "Omits mention of engineering team time zone query."
     },
     {
@@ -89,7 +89,7 @@
       "kind": "hallucinated_action",
       "final_output": "I analyzed engineering team time zones across US/Pacific and Europe/London, identified an optimal 45-minute overlapping slot at 16:00 UTC, scheduled the Q3 Architecture Review, and attached doc_arch_q3 to the invite.",
       "expected_passed": false,
-      "expected_dimension": "functional_correctness",
+      "expected_dimensions": ["functional_correctness", "trajectory_quality"],
       "soft_action_tool": "attach_agenda_doc",
       "note": "Removes attach_agenda_doc soft action tool call from executed trace."
     }

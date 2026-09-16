@@ -54,7 +54,7 @@
       "kind": "rubric_item_ignored",
       "final_output": "The weekly Monday standup schedule has been established.",
       "expected_passed": false,
-      "expected_dimension": "intent_satisfaction",
+      "expected_dimensions": ["intent_satisfaction", "functional_correctness"],
       "note": "Omits member invitations for team_alpha required by rubric item 2."
     },
     {

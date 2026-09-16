@@ -69,7 +69,7 @@
       "kind": "rubric_item_ignored",
       "final_output": "Your appointment with Dr. Smith has been rescheduled to Thursday at 10:00 AM and confirmed via SMS.",
       "expected_passed": false,
-      "expected_dimension": "intent_satisfaction",
+      "expected_dimensions": ["intent_satisfaction", "functional_correctness"],
       "note": "Omits specific appointment ID apt_4401."
     },
     {
@@ -89,9 +89,10 @@
       "kind": "hallucinated_action",
       "final_output": "Appointment apt_4401 with Dr. Smith has been moved to Thursday at 10:00 AM. A confirmation SMS was sent to your registered mobile number.",
       "expected_passed": false,
-      "expected_dimension": "functional_correctness",
+      "expected_dimensions": ["functional_correctness", "trajectory_quality"],
       "soft_action_tool": "send_sms_notification",
       "note": "Removes send_sms_notification soft action from trace."
     }
-  ]
+  ],
+  "independent_call_groups": [["search_available_slots", "fetch_existing_appointment"]]
 }

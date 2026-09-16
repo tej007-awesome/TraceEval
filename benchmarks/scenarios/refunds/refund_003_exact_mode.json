@@ -54,7 +54,7 @@
       "kind": "rubric_item_ignored",
       "final_output": "Your annual subscription sub_8831 has been cancelled and a prorated refund of $60.00 has been issued to your original payment method.",
       "expected_passed": false,
-      "expected_dimension": "intent_satisfaction",
+      "expected_dimensions": ["intent_satisfaction", "functional_correctness"],
       "note": "Omits the 3-5 business days processing timeframe required by rubric item 3."
     },
     {

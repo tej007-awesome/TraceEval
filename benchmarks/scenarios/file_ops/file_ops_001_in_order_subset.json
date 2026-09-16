@@ -68,7 +68,7 @@
       "kind": "rubric_item_ignored",
       "final_output": "Compressed the active log files into a tar.gz archive, cleaned the temporary working directory, and uploaded the package to GCS bucket app-logs-archive.",
       "expected_passed": false,
-      "expected_dimension": "intent_satisfaction",
+      "expected_dimensions": ["intent_satisfaction", "functional_correctness"],
       "note": "Omits source directory path /var/log/app specified in rubric item 1."
     },
     {
@@ -88,7 +88,7 @@
       "kind": "hallucinated_action",
       "final_output": "I've scanned /var/log/app, compressed the active log files into a tar.gz archive, cleaned the temporary working directory, and uploaded the package to GCS bucket app-logs-archive at 2026/09/logs.tar.gz.",
       "expected_passed": false,
-      "expected_dimension": "functional_correctness",
+      "expected_dimensions": ["functional_correctness", "trajectory_quality"],
       "soft_action_tool": "clean_temp_working_dir",
       "note": "Removes clean_temp_working_dir tool call from executed trace."
     }

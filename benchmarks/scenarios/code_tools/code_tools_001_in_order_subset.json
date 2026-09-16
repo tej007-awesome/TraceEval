@@ -68,7 +68,7 @@
       "kind": "rubric_item_ignored",
       "final_output": "I edited src/utils.py on branch fix/utils-assertion and verified that ruff linter checks pass cleanly.",
       "expected_passed": false,
-      "expected_dimension": "intent_satisfaction",
+      "expected_dimensions": ["intent_satisfaction", "functional_correctness"],
       "note": "Omits execution of test suite on tests/ required by rubric item 1."
     },
     {
@@ -88,7 +88,7 @@
       "kind": "hallucinated_action",
       "final_output": "I ran the test suite on tests/, identified the failing assertion in src/utils.py, applied the fix on branch fix/utils-assertion, and verified that ruff linter checks pass with zero violations.",
       "expected_passed": false,
-      "expected_dimension": "functional_correctness",
+      "expected_dimensions": ["functional_correctness", "trajectory_quality"],
       "soft_action_tool": "create_git_branch",
       "note": "Removes create_git_branch soft action tool call from executed trace."
     }

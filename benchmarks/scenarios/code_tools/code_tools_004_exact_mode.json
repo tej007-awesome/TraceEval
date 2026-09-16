@@ -53,7 +53,7 @@
       "kind": "rubric_item_ignored",
       "final_output": "I created the git tag v1.4.0 with release message 'Release v1.4.0'.",
       "expected_passed": false,
-      "expected_dimension": "intent_satisfaction",
+      "expected_dimensions": ["intent_satisfaction", "functional_correctness"],
       "note": "Omits building distribution package for v1.4.0 required by rubric item 1."
     },
     {

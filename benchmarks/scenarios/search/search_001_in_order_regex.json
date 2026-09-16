@@ -29,7 +29,7 @@
     },
     "rubric": [
       "Mentions search findings for 2026 AI agent SDK releases.",
-      "Summarizes key API changes from https://docs.example.com/sdk-v3.",
+      "Cites the official SDK documentation page that was fetched.",
       "Maintains an objective, informative tone."
     ]
   },
@@ -69,7 +69,7 @@
       "kind": "rubric_item_ignored",
       "final_output": "I logged the research notes to session sess_bench_search_001 and summarized that the v3 release introduces native streaming callbacks, structured tool schemas, and asynchronous multi-agent coordination pipelines.",
       "expected_passed": false,
-      "expected_dimension": "intent_satisfaction",
+      "expected_dimensions": ["intent_satisfaction", "functional_correctness"],
       "note": "Omits explicit reference to the documentation source URL (https://docs.example.com/sdk-v3) required by rubric item 2."
     },
     {
@@ -89,7 +89,7 @@
       "kind": "hallucinated_action",
       "final_output": "Based on the 2026 AI agent SDK documentation at https://docs.example.com/sdk-v3, I logged the research notes to session sess_bench_search_001 and summarized that the v3 release introduces native streaming callbacks, structured tool schemas, and asynchronous multi-agent coordination pipelines.",
       "expected_passed": false,
-      "expected_dimension": "functional_correctness",
+      "expected_dimensions": ["functional_correctness", "trajectory_quality"],
       "soft_action_tool": "log_research_notes",
       "note": "Removes log_research_notes tool call from executed trace."
     }
