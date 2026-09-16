@@ -7,7 +7,7 @@ generators of new content - see scenarios/AUTHORING.md for the authoring contrac
 """
 from __future__ import annotations
 
-from typing import List, Literal, Optional
+from typing import Dict, List, Literal, Optional
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -142,6 +142,25 @@ class EvalOutcome(BaseModel):
         description="Dimensions specifically from JUDGE_BELOW_THRESHOLD failures (a subset of "
         "actual_dimensions, which also includes JUDGE_NULL_DIMENSION) - attribution correctness "
         "is checked against this narrower list, not any dimension the judge merely mentioned.",
+    )
+    gate1_passed: bool = Field(
+        True,
+        description="Whether gate 1 alone passed - derived from whether any NON-judge "
+        "FailureCode appears in actual_codes. False only when a real gate-1 failure code "
+        "(ARG_MISMATCH, COST_EXCEEDED, etc.) is present, which - per run_evaluation's "
+        "short-circuit - also implies actual_passed=False. True means gate 1 passed and the "
+        "item reached gate 2 for real (whether gate 2 then passed or failed), which is the "
+        "signal used to separate 'Gate-1 FP' from 'Pipeline FP' and to decide whether an "
+        "item's cost/latency/judge-error stats belong in the judge-call aggregates.",
+    )
+    judge_reasoning: Optional[str] = Field(
+        None, description="scores.reasoning from the real judge call, saved only when "
+        "expected_passed != actual_passed (a gate-2 miss or a pipeline false positive), so "
+        "failures can be analysed without re-spending."
+    )
+    actual_scores: Optional[Dict[str, Optional[float]]] = Field(
+        None, description="The judge's per-dimension scores, saved under the same condition "
+        "as judge_reasoning."
     )
     is_judge_error: bool = False
     sentinel_triggered: bool = False

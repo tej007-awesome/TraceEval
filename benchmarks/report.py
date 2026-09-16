@@ -11,10 +11,13 @@ from pathlib import Path
 from typing import List
 
 from benchmarks.metrics import (
+    compute_gate1_fp_metrics,
     compute_operator_metrics,
     flip_rate_by_scenario_operator,
     gate1_share_of_detections,
     judge_error_rate_by_operator,
+    list_false_positives,
+    list_gate2_misses,
     mean_cost_and_latency,
 )
 from benchmarks.models import EvalOutcome
@@ -80,21 +83,68 @@ def build_report(payload: dict) -> str:
         lines.append(f"| {m.operator} | {m.category} | {m.n} | {_fmt_wilson(m.detection_rate)} | {_fmt_wilson(m.code_attribution_rate)} |")
     lines.append("")
 
-    lines.append("## Gate-1 false-positive rate (clean bases + benign controls)")
+    lines.append("## Gate-1 false-positive rate")
     lines.append("")
     lines.append(
-        "Does gate 1 (and, for `paraphrased_but_correct_final_answer`, the full pipeline) "
-        "incorrectly flag something that should pass? `clean_base` is the scenario's "
-        "unmutated trace - the most basic false-positive check. "
-        "`paraphrased_but_correct_final_answer` only appears when this run used judge mode "
-        "(it needs a real judge, unlike the other rows here)."
+        "Does GATE 1 ALONE incorrectly flag something that should pass, independent of what "
+        "the judge does afterward? Uses gate1_passed (derived from actual_codes - False only "
+        "when a real gate-1 failure code is present), not the final pipeline verdict. "
+        "`clean_base` is the scenario's unmutated trace, judged at k repeats in judge mode "
+        "(gate 1 should always pass it by construction). A benign item that gate 1 correctly "
+        "passed but the judge later flagged does NOT count here - see 'Pipeline "
+        "false-positive rate' below for that."
     )
     lines.append("")
-    lines.append("| Operator | n | FP rate (95% CI) |")
+    lines.append("| Operator | n | Gate-1 FP rate (95% CI) |")
+    lines.append("|---|---|---|")
+    for m in compute_gate1_fp_metrics(outcomes):
+        lines.append(f"| {m.operator} | {m.n} | {_fmt_wilson(m.false_positive_rate)} |")
+    lines.append("")
+
+    lines.append("## Pipeline false-positive rate (final verdict)")
+    lines.append("")
+    lines.append(
+        "Does the FULL pipeline (gate 1 + gate 2 combined) incorrectly fail something that "
+        "should pass? This is a strictly-equal-or-higher rate than the gate-1-only table "
+        "above, since every gate-1 FP is also a pipeline FP, but a benign item can additionally "
+        "be flagged by the judge even when gate 1 was fine - that gap is exactly what the two "
+        "tables together are meant to expose. `paraphrased_but_correct_final_answer` only "
+        "appears when this run used judge mode (it needs a real judge)."
+    )
+    lines.append("")
+    lines.append("| Operator | n | Pipeline FP rate (95% CI) |")
     lines.append("|---|---|---|")
     for m in compute_operator_metrics(benign_outcomes):
         lines.append(f"| {m.operator} | {m.n} | {_fmt_wilson(m.false_positive_rate)} |")
     lines.append("")
+
+    fp_incidents = list_false_positives(outcomes)
+    if fp_incidents:
+        lines.append("## False-positive incidents (detail)")
+        lines.append("")
+        lines.append("| Scenario | Operator | k | Failing gate | Codes | Dimensions |")
+        lines.append("|---|---|---|---|---|---|")
+        for r in fp_incidents:
+            lines.append(
+                f"| {r['scenario_id']} | {r['operator']} | {r['k']} | {r['failing_gate']} | "
+                f"{', '.join(r['actual_codes']) or '—'} | {', '.join(r['actual_below_threshold_dimensions']) or '—'} |"
+            )
+        lines.append("")
+
+    gate2_misses = list_gate2_misses(outcomes)
+    if gate2_misses:
+        lines.append("## Gate-2 misses (detail)")
+        lines.append("")
+        lines.append("Fault operators the pipeline failed to catch at all (expected to fail, but passed).")
+        lines.append("")
+        lines.append("| Scenario | Operator | k | Expected code | Expected dimensions |")
+        lines.append("|---|---|---|---|---|")
+        for r in gate2_misses:
+            lines.append(
+                f"| {r['scenario_id']} | {r['operator']} | {r['k']} | {r['expected_code'] or '—'} | "
+                f"{', '.join(r['expected_dimensions']) or '—'} |"
+            )
+        lines.append("")
 
     if hallucinated:
         lines.append("## hallucinated_action (separate table — see plan caveat)")
