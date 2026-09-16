@@ -63,23 +63,37 @@ def build_report(payload: dict) -> str:
     # "soft" action while gate 1's trajectory check doesn't require that tool at all), so its
     # numbers aren't directly comparable to the other gate-2 fault operators.
     hallucinated = [o for o in outcomes if o.operator == "hallucinated_action"]
-    other_outcomes = [o for o in outcomes if o.operator != "hallucinated_action"]
+    fault_outcomes = [o for o in outcomes if o.operator != "hallucinated_action" and o.category != "benign"]
+    benign_outcomes = [o for o in outcomes if o.category == "benign"]
 
-    lines.append("## Per-operator detection / false-positive rates")
+    lines.append("## Per-operator detection rates (faults)")
     lines.append("")
     lines.append(
-        "Gate-1 fault/benign metrics are a regression guard on deterministic code, not a "
-        "headline accuracy claim (see the benchmark plan). JUDGE_ERROR outcomes are excluded "
-        "from these rates and reported separately below."
+        "Gate-1 fault metrics are a regression guard on deterministic code, not a headline "
+        "accuracy claim (see the benchmark plan). JUDGE_ERROR outcomes are excluded from "
+        "these rates and reported separately below."
     )
     lines.append("")
-    lines.append("| Operator | Category | n | Detection rate (95% CI) | Code/dimension attribution | FP rate (95% CI) |")
-    lines.append("|---|---|---|---|---|---|")
-    for m in compute_operator_metrics(other_outcomes):
-        det = _fmt_wilson(m.detection_rate) if m.category != "benign" else "—"
-        attr = _fmt_wilson(m.code_attribution_rate) if m.category != "benign" else "—"
-        fp = _fmt_wilson(m.false_positive_rate) if m.category == "benign" else "—"
-        lines.append(f"| {m.operator} | {m.category} | {m.n} | {det} | {attr} | {fp} |")
+    lines.append("| Operator | Category | n | Detection rate (95% CI) | Code/dimension attribution |")
+    lines.append("|---|---|---|---|---|")
+    for m in compute_operator_metrics(fault_outcomes):
+        lines.append(f"| {m.operator} | {m.category} | {m.n} | {_fmt_wilson(m.detection_rate)} | {_fmt_wilson(m.code_attribution_rate)} |")
+    lines.append("")
+
+    lines.append("## Gate-1 false-positive rate (clean bases + benign controls)")
+    lines.append("")
+    lines.append(
+        "Does gate 1 (and, for `paraphrased_but_correct_final_answer`, the full pipeline) "
+        "incorrectly flag something that should pass? `clean_base` is the scenario's "
+        "unmutated trace - the most basic false-positive check. "
+        "`paraphrased_but_correct_final_answer` only appears when this run used judge mode "
+        "(it needs a real judge, unlike the other rows here)."
+    )
+    lines.append("")
+    lines.append("| Operator | n | FP rate (95% CI) |")
+    lines.append("|---|---|---|")
+    for m in compute_operator_metrics(benign_outcomes):
+        lines.append(f"| {m.operator} | {m.n} | {_fmt_wilson(m.false_positive_rate)} |")
     lines.append("")
 
     if hallucinated:

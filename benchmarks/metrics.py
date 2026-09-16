@@ -94,9 +94,12 @@ def compute_operator_metrics(outcomes: List[EvalOutcome]) -> List[OperatorMetric
 
 
 def judge_error_rate_by_operator(outcomes: List[EvalOutcome]) -> Dict[str, WilsonInterval]:
+    """Only operators that actually reach a real judge call (expected_gate == 'gate2') -
+    excludes clean_base and the gate-1-decidable benign controls, which never call the
+    judge for real even when the sentinel fires in --gate1-only mode."""
     by_operator: Dict[str, List[EvalOutcome]] = defaultdict(list)
     for o in outcomes:
-        if o.expected_gate == "gate2" or o.category != "gate1_fault":
+        if o.expected_gate == "gate2":
             by_operator[o.operator].append(o)
     return {
         op: wilson_interval(sum(1 for o in items if o.is_judge_error), len(items))

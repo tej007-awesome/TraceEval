@@ -34,7 +34,7 @@ from traceeval.core.schema import EDDTestCase, FailureCode
 from traceeval.pricing import DEFAULT_PRICING, compute_cost
 
 from benchmarks.cache import DEFAULT_CACHE_DIR, JudgeCache, cache_key
-from benchmarks.models import EvalOutcome, Scenario
+from benchmarks.models import EvalOutcome, OperatorResult, Scenario
 from benchmarks.operators import apply_all
 
 
@@ -102,7 +102,36 @@ def _outcome_from_result(result, scenario_id, domain, operator, category, expect
     )
 
 
+def _outcome_for_gate1_decidable(result, scenario_id, domain, operator, category, expected, latency_ms) -> EvalOutcome:
+    """For clean bases and gate-1-decidable benign controls: if the sentinel fired, gate 1
+    legitimately PASSED and reached the judge stage - the correct, expected outcome for
+    these items, not an error. Only gate1_fault items (handled by _outcome_from_result)
+    treat a sentinel hit as a regression."""
+    codes = [fd.code.value for fd in result.failure_details]
+    dims = [fd.dimension for fd in result.failure_details if fd.dimension]
+    is_judge_error = FailureCode.JUDGE_ERROR.value in codes
+    sentinel_triggered = is_judge_error and any(
+        "SENTINEL" in (fd.message or "") for fd in result.failure_details
+    )
+    actual_passed = True if sentinel_triggered else result.passed
+    actual_codes = [] if sentinel_triggered else codes
+    return EvalOutcome(
+        scenario_id=scenario_id, domain=domain, operator=operator, category=category, k=0,
+        expected_passed=expected.expected_passed, expected_gate=expected.expected_gate,
+        expected_code=expected.expected_code, expected_dimension=expected.expected_dimension,
+        label=expected.label,
+        actual_passed=actual_passed, actual_codes=actual_codes, actual_dimensions=dims,
+        is_judge_error=False, sentinel_triggered=sentinel_triggered, retries=0,
+        latency_ms=latency_ms, cost_usd=0.0, from_cache=False,
+    )
+
+
 async def run_gate1_only(scenarios: List[Scenario], seed: int) -> List[EvalOutcome]:
+    """Runs everything gate 1 can decide on its own: gate1_fault operator results (sentinel
+    hit = regression), the clean base trace itself, and the three gate-1-decidable benign
+    controls (extra_args_under_subset, reorder_under_any_order, regex_conforming_variable_value
+    - sentinel hit = correct/expected). gate2_fault operators and the paraphrase benign
+    control are skipped entirely - they inherently need a real judge."""
     import traceeval.metrics.trajectory_judge as tj
 
     outcomes: List[EvalOutcome] = []
@@ -110,16 +139,38 @@ async def run_gate1_only(scenarios: List[Scenario], seed: int) -> List[EvalOutco
     tj.evaluate_dimensions = _sentinel_judge
     try:
         for scenario in scenarios:
+            clean_expected = OperatorResult(
+                scenario_id=scenario.id, domain=scenario.domain, operator="clean_base", category="benign",
+                applicable=True, expected_passed=True, expected_gate="gate1",
+                label="clean base trace (unmutated)",
+            )
+            start = time.monotonic()
+            result = await tj.run_evaluation(scenario.case, scenario.trace, max_cost=0.10, score_threshold=0.8)
+            latency_ms = (time.monotonic() - start) * 1000
+            outcomes.append(_outcome_for_gate1_decidable(
+                result, scenario.id, scenario.domain, "clean_base", "benign", clean_expected, latency_ms,
+            ))
+
             for r in apply_all(scenario, seed):
-                if not r.applicable or r.category != "gate1_fault":
+                if not r.applicable:
                     continue
-                start = time.monotonic()
-                result = await tj.run_evaluation(r.mutated_case, r.mutated_trace, max_cost=0.10, score_threshold=0.8)
-                latency_ms = (time.monotonic() - start) * 1000
-                outcomes.append(_outcome_from_result(
-                    result, scenario.id, scenario.domain, r.operator, r.category, r, k=0,
-                    latency_ms=latency_ms, cost_usd=0.0, retries=0, from_cache=False,
-                ))
+                if r.category == "gate1_fault":
+                    start = time.monotonic()
+                    result = await tj.run_evaluation(r.mutated_case, r.mutated_trace, max_cost=0.10, score_threshold=0.8)
+                    latency_ms = (time.monotonic() - start) * 1000
+                    outcomes.append(_outcome_from_result(
+                        result, scenario.id, scenario.domain, r.operator, r.category, r, k=0,
+                        latency_ms=latency_ms, cost_usd=0.0, retries=0, from_cache=False,
+                    ))
+                elif r.category == "benign" and r.expected_gate == "gate1":
+                    start = time.monotonic()
+                    result = await tj.run_evaluation(r.mutated_case, r.mutated_trace, max_cost=0.10, score_threshold=0.8)
+                    latency_ms = (time.monotonic() - start) * 1000
+                    outcomes.append(_outcome_for_gate1_decidable(
+                        result, scenario.id, scenario.domain, r.operator, r.category, r, latency_ms,
+                    ))
+                # gate2_fault operators, and the paraphrase benign control (expected_gate ==
+                # "gate2"), are skipped here - they inherently need a real judge call.
     finally:
         tj.evaluate_dimensions = original_evaluate_dimensions
     return outcomes
@@ -146,7 +197,8 @@ async def run_judge_mode(
     seed: int,
     k: int,
     judge_model: str,
-    temperature: float,
+    judge_temperature: Optional[float],
+    reasoning_effort: Optional[str],
     max_total_cost_usd: Optional[float],
     cache_dir: Path,
     use_cache: bool,
@@ -159,7 +211,11 @@ async def run_judge_mode(
     tracker: dict = {"last_usage": None}
     real_get_client = config_module.get_judge_client
     original_settings_model = config_module.settings.llm_model_name
+    original_settings_temperature = config_module.settings.judge_temperature
+    original_settings_reasoning = config_module.settings.judge_reasoning_effort
     config_module.settings.llm_model_name = judge_model
+    config_module.settings.judge_temperature = judge_temperature
+    config_module.settings.judge_reasoning_effort = reasoning_effort
     tj.get_judge_client = lambda: _TrackedClient(real_get_client(), tracker)
 
     outcomes: List[EvalOutcome] = []
@@ -191,7 +247,7 @@ async def run_judge_mode(
                     if max_total_cost_usd is not None and total_cost >= max_total_cost_usd:
                         cost_cap_hit = True
                         break
-                    key = cache_key(r.mutated_case, r.mutated_trace, judge_model, temperature, k_idx)
+                    key = cache_key(r.mutated_case, r.mutated_trace, judge_model, judge_temperature, k_idx)
                     cached = cache.get(key) if use_cache else None
                     if cached is not None:
                         outcomes.append(_outcome_from_result(
@@ -214,6 +270,12 @@ async def run_judge_mode(
                             pricing,
                         )
                         cost_usd = cost_result.total_usd
+                        if cost_result.unknown_models:
+                            print(
+                                f"WARNING: no pricing entry for model(s) {cost_result.unknown_models} - "
+                                f"cost reported as $0 for this call; add a pricing entry to get real cost tracking.",
+                                file=sys.stderr,
+                            )
                     total_cost += cost_usd
 
                     cache.set(key, result)
@@ -224,6 +286,8 @@ async def run_judge_mode(
     finally:
         tj.get_judge_client = real_get_client
         config_module.settings.llm_model_name = original_settings_model
+        config_module.settings.judge_temperature = original_settings_temperature
+        config_module.settings.judge_reasoning_effort = original_settings_reasoning
 
     return outcomes, cost_cap_hit
 
@@ -234,8 +298,20 @@ def main():
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--gate1-only", action="store_true")
     parser.add_argument("--k", type=int, default=3)
-    parser.add_argument("--judge-model", type=str, default="gpt-5.6-luna")
-    parser.add_argument("--temperature", type=float, default=0.0)
+    # Dated snapshot (not the alias), per OpenRouter's public /models catalog
+    # (canonical_slug "openai/gpt-5.6-luna-20260709", verified 2026-09-16). This is the
+    # model string that works through THIS repo's configured LLM_BASE_URL (OpenRouter);
+    # direct-OpenAI users should override with OpenAI's own dated snapshot ID.
+    parser.add_argument("--judge-model", type=str, default="openai/gpt-5.6-luna-20260709")
+    # gpt-5.6-luna's supported_parameters (per OpenRouter's catalog) do not list
+    # "temperature" (default_parameters.temperature is null) - NOT verified by a live call
+    # (see PR discussion: the configured judge account has zero credits). Default to
+    # omitting it; pass --judge-temperature to force a value if your provider needs one.
+    parser.add_argument("--judge-temperature", type=float, default=None)
+    # Lowest of gpt-5.6-luna's supported_efforts (max/xhigh/high/medium/low/none), per the
+    # same catalog metadata - configurable since "none" may be too little reasoning for some
+    # judge tasks; this is a cost-conscious default, not a quality-verified one.
+    parser.add_argument("--reasoning-effort", type=str, default="none")
     parser.add_argument("--max-total-cost-usd", type=float, default=None)
     parser.add_argument("--cache-dir", type=Path, default=DEFAULT_CACHE_DIR)
     parser.add_argument("--no-cache", action="store_true")
@@ -253,7 +329,7 @@ def main():
     else:
         pricing = dict(DEFAULT_PRICING)
         outcomes, cost_cap_hit = asyncio.run(run_judge_mode(
-            scenarios, args.seed, args.k, args.judge_model, args.temperature,
+            scenarios, args.seed, args.k, args.judge_model, args.judge_temperature, args.reasoning_effort,
             args.max_total_cost_usd, args.cache_dir, use_cache=not args.no_cache, pricing=pricing,
         ))
 
@@ -266,7 +342,8 @@ def main():
             "gate1_only": args.gate1_only,
             "k": 0 if args.gate1_only else args.k,
             "judge_model": None if args.gate1_only else args.judge_model,
-            "temperature": None if args.gate1_only else args.temperature,
+            "judge_temperature": None if args.gate1_only else args.judge_temperature,
+            "reasoning_effort": None if args.gate1_only else args.reasoning_effort,
             "n_scenarios": len(scenarios),
             "cost_cap_hit": cost_cap_hit,
         },
@@ -284,16 +361,26 @@ def main():
         print("\n!!! --max-total-cost-usd cap was hit; partial results written.")
 
     if args.gate1_only:
-        mismatches = [
+        fault_mismatches = [
             o for o in outcomes
-            if not (o.actual_passed is False and o.expected_passed is False and (o.expected_code is None or o.expected_code.value in o.actual_codes))
+            if o.category == "gate1_fault"
+            and not (o.actual_passed is False and o.expected_passed is False and (o.expected_code is None or o.expected_code.value in o.actual_codes))
         ]
-        if mismatches or sentinel_hits:
-            print(f"\n!!! --gate1-only regression check FAILED: {len(mismatches)} mismatch(es), {len(sentinel_hits)} sentinel hit(s).")
-            for o in mismatches:
-                print(f"    MISMATCH {o.scenario_id} / {o.operator}: expected_code={o.expected_code} actual_codes={o.actual_codes} actual_passed={o.actual_passed}")
+        false_positives = [
+            o for o in outcomes
+            if o.category != "gate1_fault" and o.expected_passed is True and o.actual_passed is False
+        ]
+        if fault_mismatches or false_positives or sentinel_hits:
+            print(
+                f"\n!!! --gate1-only regression check FAILED: {len(fault_mismatches)} fault mismatch(es), "
+                f"{len(false_positives)} false positive(s), {len(sentinel_hits)} sentinel hit(s)."
+            )
+            for o in fault_mismatches:
+                print(f"    FAULT MISMATCH {o.scenario_id} / {o.operator}: expected_code={o.expected_code} actual_codes={o.actual_codes} actual_passed={o.actual_passed}")
+            for o in false_positives:
+                print(f"    FALSE POSITIVE {o.scenario_id} / {o.operator}: expected_passed=True actual_passed=False actual_codes={o.actual_codes}")
             sys.exit(1)
-        print(f"\n--gate1-only regression check passed: all {len(outcomes)} gate1_fault outcomes matched expectations.")
+        print(f"\n--gate1-only regression check passed: all {len(outcomes)} outcomes matched expectations.")
 
 
 if __name__ == "__main__":

@@ -95,3 +95,15 @@ def test_judge_error_rate_by_operator_only_counts_gate2_items():
     rates = judge_error_rate_by_operator([o1, o2])
     assert "wrong_arg_value" not in rates
     assert rates["incorrect_final_answer"].point == 1.0
+
+
+def test_judge_error_rate_by_operator_excludes_gate1_benign_and_clean_base():
+    # clean_base and the gate-1-decidable benign controls never make a real judge call
+    # (even when the sentinel fires in --gate1-only mode, is_judge_error is forced False) -
+    # they must not appear in the judge-error-rate table at all.
+    clean_base = _outcome("clean_base", "benign", True, True)
+    clean_base.expected_gate = "gate1"
+    benign = _outcome("extra_args_under_subset", "benign", True, True)
+    benign.expected_gate = "gate1"
+    rates = judge_error_rate_by_operator([clean_base, benign])
+    assert rates == {}
