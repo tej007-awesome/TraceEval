@@ -160,7 +160,11 @@ def validate_trajectory(
         reason_details = []
         for rank, i in enumerate(range(expected_idx, len(expected))):
             exp_tool = expected[i]
-            matched_actual_idx = next((idx for idx, a in enumerate(actual) if _tool_matches(exp_tool, a)), None)
+            # Only search UNCONSUMED actual calls: a full match that was already used to
+            # advance the pointer for an earlier expected call isn't "out there somewhere
+            # out of order" for this one too — from this call's perspective it was never
+            # called. Mirrors _classify_miss's unconsumed-only rule below.
+            matched_actual_idx = next((idx for idx, a in unconsumed if _tool_matches(exp_tool, a)), None)
             present_anywhere = matched_actual_idx is not None
             if rank == 0:
                 # First unmatched: always report; distinguish absent vs wrong order.

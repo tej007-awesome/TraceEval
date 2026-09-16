@@ -730,6 +730,29 @@ def test_classify_miss_only_considers_unconsumed_actual_any_order():
     assert d.expected_index == 1
 
 
+def test_in_order_present_anywhere_uses_unconsumed_actual_flexible_mode():
+    # The ANY-mode expected call consumes the only actual call during the two-pointer scan.
+    # The second (EXACT) expected call must NOT be classified as "out of order" just because
+    # that same, already-consumed actual call happens to also satisfy it in isolation.
+    any_search = ExpectedToolCall(tool_name="search", args={"q": "unused"}, arg_match_mode=ArgMatchMode.ANY)
+    exact_search = ExpectedToolCall(tool_name="search", args={"q": "x"})
+    actual = [ToolCall(tool_name="search", args={"q": "x"})]
+    r = validate_trajectory([any_search, exact_search], actual, TrajectoryMode.IN_ORDER)
+    assert len(r.reason_details) == 1
+    assert r.reason_details[0].code == FailureCode.TOOL_CALL_NEVER_CALLED
+    assert "was never called" in r.reasons[0]
+
+
+def test_in_order_present_anywhere_uses_unconsumed_actual_plain_duplicate():
+    # Plain duplicate expectations: [tool_a, tool_a] vs a trace with only one tool_a call.
+    # The second tool_a consumes nothing new, so it must be TOOL_CALL_NEVER_CALLED, not
+    # TOOL_CALL_OUT_OF_ORDER (there is no leftover, unconsumed occurrence of it anywhere).
+    r = validate_trajectory([tool_a, tool_a], [tool_a], TrajectoryMode.IN_ORDER)
+    assert len(r.reason_details) == 1
+    assert r.reason_details[0].code == FailureCode.TOOL_CALL_NEVER_CALLED
+    assert "was never called" in r.reasons[0]
+
+
 def test_any_order_bipartite_matching_regression():
     # Greedy multiset removal would incorrectly fail this: the ANY-mode expected call could
     # steal the actual call the exact-mode expected call uniquely needs. A correct maximum
