@@ -32,8 +32,14 @@ def _fmt_pct(x: float) -> str:
     return f"{x:.0%}"
 
 
-def _build_section(outcomes: List[EvalOutcome], config: dict) -> List[str]:
-    """All the per-operator/detail tables for one set of outcomes (dev or holdout)."""
+def _build_section(outcomes: List[EvalOutcome], config: dict, aggregate_only: bool = False) -> List[str]:
+    """All the per-operator/detail tables for one set of outcomes (dev or holdout).
+
+    aggregate_only=True suppresses every table that names a specific scenario_id (sentinel
+    hits, FP incidents, gate-2 misses) - used for the holdout section so it reports only
+    operator-level rates, never which holdout scenario failed or how, which would let a
+    reader learn holdout-specific failure patterns and defeat the point of holding it out.
+    """
     lines: List[str] = []
 
     if not outcomes:
@@ -42,7 +48,16 @@ def _build_section(outcomes: List[EvalOutcome], config: dict) -> List[str]:
         return lines
 
     sentinel_hits = [o for o in outcomes if o.category == "gate1_fault" and o.sentinel_triggered]
-    if sentinel_hits:
+    if sentinel_hits and aggregate_only:
+        lines.append("#### ⚠️ Gate-1 short-circuit regressions")
+        lines.append("")
+        lines.append(
+            f"{len(sentinel_hits)} gate1_fault item(s) reached the judge (sentinel fired) "
+            "instead of short-circuiting at gate 1 as expected - a real regression. Scenario-"
+            "level detail is withheld in this aggregate-only section."
+        )
+        lines.append("")
+    elif sentinel_hits:
         lines.append("#### ⚠️ Gate-1 short-circuit regressions")
         lines.append("")
         lines.append(
@@ -115,7 +130,7 @@ def _build_section(outcomes: List[EvalOutcome], config: dict) -> List[str]:
     lines.append("")
 
     fp_incidents = list_false_positives(outcomes)
-    if fp_incidents:
+    if fp_incidents and not aggregate_only:
         lines.append("#### False-positive incidents (detail)")
         lines.append("")
         lines.append("| Scenario | Operator | k | Failing gate | Codes | Dimensions |")
@@ -126,9 +141,17 @@ def _build_section(outcomes: List[EvalOutcome], config: dict) -> List[str]:
                 f"{', '.join(r['actual_codes']) or '—'} | {', '.join(r['actual_below_threshold_dimensions']) or '—'} |"
             )
         lines.append("")
+    elif fp_incidents:
+        lines.append("#### False-positive incidents (detail)")
+        lines.append("")
+        lines.append(
+            f"{len(fp_incidents)} false-positive incident(s) in this split. Scenario-level "
+            "detail is withheld in this aggregate-only section - see the rate tables above."
+        )
+        lines.append("")
 
     gate2_misses = list_gate2_misses(outcomes)
-    if gate2_misses:
+    if gate2_misses and not aggregate_only:
         lines.append("#### Gate-2 misses (detail)")
         lines.append("")
         lines.append("Fault operators the pipeline failed to catch at all (expected to fail, but passed).")
@@ -141,6 +164,15 @@ def _build_section(outcomes: List[EvalOutcome], config: dict) -> List[str]:
                 f"| {r['scenario_id']} | {r['operator']} | {r['k']} | {expected_code.value if expected_code else '—'} | "
                 f"{', '.join(r['expected_dimensions']) or '—'} |"
             )
+        lines.append("")
+    elif gate2_misses:
+        lines.append("#### Gate-2 misses (detail)")
+        lines.append("")
+        lines.append(
+            f"{len(gate2_misses)} gate-2 miss(es) in this split (fault operators the pipeline "
+            "failed to catch). Scenario-level detail is withheld in this aggregate-only "
+            "section - see the per-operator detection-rate table above."
+        )
         lines.append("")
 
     if hallucinated:
@@ -228,10 +260,12 @@ def build_report(payload: dict) -> str:
         lines.append(
             "Metrics over the 5 holdout scenarios (one per domain, `benchmarks/holdout.json`), "
             "which were never used to tune operators, scenario content, or judge config - a "
-            "basic check against overfitting the benchmark to itself."
+            "basic check against overfitting the benchmark to itself. **Aggregate numbers "
+            "only**: no per-scenario detail, judge reasoning, or examples are shown here, so "
+            "reading this section can't teach you a holdout-specific failure pattern."
         )
         lines.append("")
-        lines.extend(_build_section(holdout_outcomes, config))
+        lines.extend(_build_section(holdout_outcomes, config, aggregate_only=True))
     else:
         lines.append(
             "No holdout outcomes in this run - holdout scenarios are excluded by default. "
