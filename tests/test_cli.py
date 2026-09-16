@@ -226,3 +226,38 @@ def test_cli_regex_arg_mismatch_prints_failure_reason(tmp_path, monkeypatch):
     assert res.exit_code == 1
     assert "Failure Reasons:" in res.stdout
     assert "was never called" in res.stdout
+
+
+@patch("traceeval.metrics.trajectory_judge.get_judge_client")
+def test_cli_judge_error_prints_failure_reason(mock_get_client, tmp_path, monkeypatch):
+    monkeypatch.setenv("OPENAI_API_KEY", "mock-key")
+    mock_client = AsyncMock()
+    mock_get_client.return_value = mock_client
+
+    # Simulate the judge returning no choices at all -> evaluate_dimensions raises ValueError,
+    # which run_evaluation now converts into a normal (renderable) JUDGE_ERROR result instead
+    # of letting it propagate to cli.py's generic "Evaluation Engine Error" handler.
+    mock_response = AsyncMock()
+    mock_response.choices = []
+    mock_client.chat.completions.create.return_value = mock_response
+
+    case = {
+        "case_id": "c1",
+        "input_prompt": "p",
+        "expected_tool_calls": [],
+        "rubric": ["r"],
+    }
+    trace = {
+        "session_id": "s1",
+        "triggered_skills": [],
+        "executed_tools": [],
+        "final_output": "done",
+        "total_token_cost_usd": 0.01,
+    }
+    case_path, trace_path = _write_case_and_trace(tmp_path, case, trace)
+
+    res = runner.invoke(app, ["run", "--case", str(case_path), "--trace", str(trace_path)])
+    assert res.exit_code == 1
+    assert "Failure Reasons:" in res.stdout
+    assert "Judge LLM returned no response" in res.stdout
+    assert "Evaluation Engine Error" not in res.stdout

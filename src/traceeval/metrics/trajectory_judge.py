@@ -410,28 +410,60 @@ async def run_evaluation(
         )
 
     logger.info(f"Deterministic checks passed. Triggering semantic evaluation via {settings.llm_model_name}...")
-    scores = await evaluate_dimensions(trace=trace, case=case)
+    try:
+        scores = await evaluate_dimensions(trace=trace, case=case)
+    except Exception as e:
+        # Broad catch is deliberate: evaluate_dimensions only wraps response-shape problems
+        # (no response / empty content / unparseable JSON) in ValueError, but real API
+        # failures (rate limits, timeouts, connection errors) raise whatever type the
+        # underlying client uses. A single bad/flaky judge call must become a normal, renderable
+        # JUDGE_ERROR result rather than an uncaught exception, so a batch runner evaluating
+        # many cases doesn't crash on one flaky call.
+        logger.warning(f"Semantic Gate Failed: judge call raised an error: {e}")
+        error_scores = EvaluationDimensionScore(
+            intent_satisfaction=0.0,
+            functional_correctness=0.0,
+            trajectory_quality=0.0,
+            cost_efficiency=0.0,
+            safety_and_rai=0.0,
+            reasoning=f"JUDGE ERROR: {e}",
+        )
+        return EvaluationResult(
+            case_id=case.case_id,
+            passed=False,
+            scores=error_scores,
+            trace_summary=trace,
+            failures=failures + [str(e)],
+            failure_details=failure_details + [FailureReason(code=FailureCode.JUDGE_ERROR, message=str(e))],
+        )
     logger.info("Semantic evaluation completed.")
 
     for field in _REQUIRED_DIMENSIONS:
         if getattr(scores, field) is None:
             logger.warning(f"Semantic Gate Failed: required dimension '{field}' is null")
             passed = False
-            failures.append(f"judge returned null for required dimension {field}")
+            msg = f"judge returned null for required dimension {field}"
+            failures.append(msg)
+            failure_details.append(FailureReason(code=FailureCode.JUDGE_NULL_DIMENSION, message=msg, dimension=field))
 
     dimensions_to_check = {
-        "Intent Satisfaction": scores.intent_satisfaction,
-        "Functional Correctness": scores.functional_correctness,
-        "Trajectory Quality": scores.trajectory_quality,
-        "Cost Efficiency": scores.cost_efficiency,
-        "Safety & RAI": scores.safety_and_rai,
+        "Intent Satisfaction": ("intent_satisfaction", scores.intent_satisfaction),
+        "Functional Correctness": ("functional_correctness", scores.functional_correctness),
+        "Trajectory Quality": ("trajectory_quality", scores.trajectory_quality),
+        "Cost Efficiency": ("cost_efficiency", scores.cost_efficiency),
+        "Safety & RAI": ("safety_and_rai", scores.safety_and_rai),
     }
 
-    for dim_name, score in dimensions_to_check.items():
+    for dim_name, (field_name, score) in dimensions_to_check.items():
         if score is not None and score < score_threshold:
             logger.warning(f"Semantic Gate Failed: {dim_name} score ({score}) is below threshold ({score_threshold})")
             passed = False
-            failures.append(f"{dim_name}: {score} < {score_threshold}")
+            msg = f"{dim_name}: {score} < {score_threshold}"
+            failures.append(msg)
+            failure_details.append(FailureReason(
+                code=FailureCode.JUDGE_BELOW_THRESHOLD, message=msg,
+                expected=score_threshold, actual=score, dimension=field_name,
+            ))
 
     return EvaluationResult(
         case_id=case.case_id,

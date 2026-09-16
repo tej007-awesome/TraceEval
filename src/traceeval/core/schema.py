@@ -30,6 +30,9 @@ class FailureCode(str, Enum):
     COST_EXCEEDED = "COST_EXCEEDED"
     COST_INCOMPLETE = "COST_INCOMPLETE"
     SKILL_NOT_TRIGGERED = "SKILL_NOT_TRIGGERED"
+    JUDGE_BELOW_THRESHOLD = "JUDGE_BELOW_THRESHOLD"
+    JUDGE_NULL_DIMENSION = "JUDGE_NULL_DIMENSION"
+    JUDGE_ERROR = "JUDGE_ERROR"
 
 class FailureReason(BaseModel):
     """Structured detail for a single failure, carried alongside the plain-text reason string."""
@@ -40,6 +43,7 @@ class FailureReason(BaseModel):
     span_id: Optional[str] = None
     expected: Optional[Any] = None
     actual: Optional[Any] = None
+    dimension: Optional[str] = Field(None, description="Snake_case EvaluationDimensionScore field name, for gate-2 (judge) failures.")
 
 class CheckResult(BaseModel):
     """Outcome of a single deterministic gate, with human-readable reasons on failure."""

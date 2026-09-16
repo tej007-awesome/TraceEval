@@ -25,6 +25,10 @@ Every failure explains itself, for example:
 ✗ cost $5.5000 exceeds budget $0.1000
 ```
 
+If the judge itself fails to respond (rate limit, empty response, unparseable output), that
+also renders as a normal `FAILED` result with a `Failure Reasons:` entry describing the judge
+error, rather than a bare CLI error — the exit code is still 1 either way.
+
 ## Features
 
 - **Three trace sources:** TraceEval JSON traces, OpenTelemetry GenAI traces, or a live Python agent function run in-process
