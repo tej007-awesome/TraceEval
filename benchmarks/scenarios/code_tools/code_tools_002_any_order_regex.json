@@ -93,5 +93,5 @@
       "note": "Removes format_codebase soft action tool call from executed trace."
     }
   ],
-  "independent_call_groups": [["grep_codebase", "format_codebase", "fetch_git_commit_info"]]
+  "independent_call_groups": [["grep_codebase", "fetch_git_commit_info"]]
 }

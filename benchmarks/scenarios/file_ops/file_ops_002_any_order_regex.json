@@ -94,5 +94,5 @@
       "note": "Removes create_backup_copy soft action from executed trace."
     }
   ],
-  "independent_call_groups": [["list_directory_files", "rsync_sync_directory", "generate_diff_summary"]]
+  "independent_call_groups": [["list_directory_files", "rsync_sync_directory"]]
 }

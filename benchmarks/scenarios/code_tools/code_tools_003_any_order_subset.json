@@ -94,5 +94,5 @@
       "note": "Removes generate_type_stub soft action tool call from executed trace."
     }
   ],
-  "independent_call_groups": [["generate_type_stub", "run_mypy_check", "read_source_ast"]]
+  "independent_call_groups": [["run_mypy_check", "read_source_ast"]]
 }
