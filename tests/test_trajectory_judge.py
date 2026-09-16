@@ -495,6 +495,92 @@ async def test_run_evaluation_null_dimensions(mock_eval_dimensions):
     assert "null" in res.failures[0]
 
 
+# --- Gate-2 (judge) structured failure codes ---
+
+
+@pytest.mark.asyncio
+@patch("traceeval.metrics.trajectory_judge.evaluate_dimensions")
+async def test_reason_details_judge_below_threshold(mock_eval_dimensions):
+    case = EDDTestCase(
+        case_id="case_1", input_prompt="Prompt", expected_tool_calls=[tool_a],
+        trajectory_mode=TrajectoryMode.IN_ORDER, rubric=["rubric 1"],
+    )
+    trace = AgentTrace(
+        session_id="s1", triggered_skills=[], executed_tools=[tool_a],
+        final_output="Output", total_token_cost_usd=0.01,
+    )
+    mock_eval_dimensions.return_value = EvaluationDimensionScore(
+        intent_satisfaction=0.5,
+        functional_correctness=0.9,
+        trajectory_quality=1.0,
+        cost_efficiency=0.8,
+        safety_and_rai=1.0,
+        reasoning="Intent not fully satisfied",
+    )
+    res = await run_evaluation(case, trace, score_threshold=0.7)
+    assert res.passed is False
+    assert len(res.failure_details) == 1
+    d = res.failure_details[0]
+    assert d.code == FailureCode.JUDGE_BELOW_THRESHOLD
+    assert d.dimension == "intent_satisfaction"
+    assert d.expected == 0.7 and d.actual == 0.5
+
+
+@pytest.mark.asyncio
+@patch("traceeval.metrics.trajectory_judge.evaluate_dimensions")
+async def test_reason_details_judge_null_dimension(mock_eval_dimensions):
+    case = EDDTestCase(
+        case_id="null_case", input_prompt="Prompt", expected_tool_calls=[tool_a],
+        trajectory_mode=TrajectoryMode.IN_ORDER, rubric=["rubric 1"],
+    )
+    trace = AgentTrace(
+        session_id="s1", triggered_skills=[], executed_tools=[tool_a],
+        final_output="Output", total_token_cost_usd=0.01,
+    )
+    mock_eval_dimensions.return_value = EvaluationDimensionScore(
+        intent_satisfaction=0.9,
+        functional_correctness=0.9,
+        trajectory_quality=0.9,
+        cost_efficiency=0.9,
+        safety_and_rai=None,
+        reasoning="Safety unclear",
+    )
+    res = await run_evaluation(case, trace)
+    assert res.passed is False
+    assert len(res.failure_details) == 1
+    d = res.failure_details[0]
+    assert d.code == FailureCode.JUDGE_NULL_DIMENSION
+    assert d.dimension == "safety_and_rai"
+
+
+@pytest.mark.asyncio
+@patch("traceeval.metrics.trajectory_judge.evaluate_dimensions")
+async def test_run_evaluation_judge_error_cases(mock_eval_dimensions):
+    case = EDDTestCase(
+        case_id="case_1", input_prompt="Prompt", expected_tool_calls=[tool_a],
+        trajectory_mode=TrajectoryMode.IN_ORDER, rubric=["rubric 1"],
+    )
+    trace = AgentTrace(
+        session_id="s1", triggered_skills=[], executed_tools=[tool_a],
+        final_output="Output", total_token_cost_usd=0.01,
+    )
+
+    for message in [
+        "Judge LLM returned no response (possibly rate-limited).",
+        "Judge LLM returned empty content.",
+        "Failed to parse LLM evaluation response.",
+    ]:
+        mock_eval_dimensions.side_effect = ValueError(message)
+        # run_evaluation must NOT raise — it converts the error into a normal result.
+        res = await run_evaluation(case, trace)
+        assert res.passed is False
+        assert len(res.failure_details) == 1
+        d = res.failure_details[0]
+        assert d.code == FailureCode.JUDGE_ERROR
+        assert message in d.message
+        assert any(message in f for f in res.failures)
+
+
 # --- Flexible arg matching: _field_matches / _tool_matches via validate_trajectory ---
 
 
