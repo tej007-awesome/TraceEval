@@ -20,6 +20,13 @@ class ModelPrice(BaseModel):
 # authoritative for billing; supply your own pricing file via load_pricing().
 DEFAULT_PRICING: Dict[str, ModelPrice] = {
     "gpt-4o-mini": ModelPrice(input_per_1m_usd=0.15, output_per_1m_usd=0.60),
+    # Verified current (GA, not deprecated) as of 2026-09-16 via developers.openai.com.
+    # OpenAI positions this tier explicitly for "efficient, high-volume workloads" -
+    # a good fit for a benchmark firing hundreds of small structured-output judge calls.
+    # gpt-4o-mini's sibling (gpt-4o) was already retired from the API in Feb 2026, and the
+    # gpt-5-nano dated snapshot is on a retirement path with OpenAI recommending migration
+    # to the gpt-5.6 family - gpt-5.6-luna is that family's cheapest tier.
+    "gpt-5.6-luna": ModelPrice(input_per_1m_usd=0.20, output_per_1m_usd=1.20),
 }
 
 

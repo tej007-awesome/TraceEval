@@ -28,3 +28,22 @@ jobs:
         
       - name: Run pytest
         run: pytest
+
+  benchmark-gate1-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v1
+
+      - name: Install dependencies
+        run: uv pip install --system -e ".[dev]"
+
+      - name: Run gate-1-only benchmark regression check (no API key needed)
+        run: python -m benchmarks.run --gate1-only --seed 0 --output benchmarks/results.json

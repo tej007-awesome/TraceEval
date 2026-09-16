@@ -34,3 +34,9 @@ SKILL.md
 # macOS
 .DS_Store
 *.swp
+
+# Benchmark run artifacts (generated, reproducible - never committed)
+benchmarks/.cache/
+benchmarks/.data-cache/
+benchmarks/results*.json
+benchmarks/report*.md
