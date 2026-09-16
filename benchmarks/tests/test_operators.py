@@ -65,7 +65,9 @@ def test_swapped_order_inapplicable_under_any_order_routes_to_benign(any_order_s
     # "routes to benign and always succeeds."
     benign_func = dict(ALL_OPERATORS)["reorder_under_any_order"]
     rng2 = random.Random(1)
-    benign_result = benign_func(any_order_scenario, rng2)
+    no_groups_scenario = any_order_scenario.model_copy(deep=True)
+    no_groups_scenario.independent_call_groups = None
+    benign_result = benign_func(no_groups_scenario, rng2)
     assert benign_result.applicable is False
     assert "independent_call_groups" in benign_result.inapplicable_reason
 

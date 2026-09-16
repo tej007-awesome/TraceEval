@@ -93,5 +93,6 @@
       "soft_action_tool": "send_sms_notification",
       "note": "Removes send_sms_notification soft action from trace."
     }
-  ]
+  ],
+  "independent_call_groups": [["search_available_slots", "fetch_existing_appointment"]]
 }

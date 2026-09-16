@@ -446,14 +446,14 @@ def reorder_under_any_order(scenario: Scenario, rng: random.Random) -> OperatorR
         if len(indices) < 2:
             continue
         items = [trace.executed_tools[i] for i in indices]
-        original_names = [tc.tool_name for tc in items]
+        original_items = list(items)
         shuffled = list(items)
         for _ in range(10):
             rng.shuffle(shuffled)
-            if [tc.tool_name for tc in shuffled] != original_names:
+            if shuffled != original_items:
                 break
-        if [tc.tool_name for tc in shuffled] == original_names:
-            continue  # this group never produced a different order (e.g. duplicate names)
+        if shuffled == original_items:
+            continue  # this group never produced a different order
         for i, tc in zip(indices, shuffled):
             trace.executed_tools[i] = tc
         changed = True

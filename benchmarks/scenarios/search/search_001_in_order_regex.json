@@ -29,7 +29,7 @@
     },
     "rubric": [
       "Mentions search findings for 2026 AI agent SDK releases.",
-      "Summarizes key API changes from https://docs.example.com/sdk-v3.",
+      "Cites the official SDK documentation page that was fetched.",
       "Maintains an objective, informative tone."
     ]
   },

@@ -90,5 +90,6 @@
       "soft_action_tool": "flag_misleading_claims",
       "note": "Removes flag_misleading_claims soft action from trace."
     }
-  ]
+  ],
+  "independent_call_groups": [["verify_citation", "cross_reference_author", "search_news_archive"]]
 }

@@ -94,5 +94,6 @@
       "soft_action_tool": "send_confirmation_email",
       "note": "send_confirmation_email is not in expected_tool_calls (a soft, output-claimed-only action) but IS in the clean trace. The operator removes it while final_output still claims the email was sent."
     }
-  ]
+  ],
+  "independent_call_groups": [["lookup_order", "check_duplicate_charge", "verify_customer_identity"]]
 }

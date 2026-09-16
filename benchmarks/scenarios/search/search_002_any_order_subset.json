@@ -93,5 +93,6 @@
       "soft_action_tool": "export_csv_report",
       "note": "Removes export_csv_report from executed tools while text still claims CSV export occurred."
     }
-  ]
+  ],
+  "independent_call_groups": [["search_provider_pricing"]]
 }
