@@ -12,7 +12,7 @@
       },
       {
         "tool_name": "cancel_and_refund_subscription",
-        "args": { "subscription_id": "sub_8831", "calculation": "prorated" }
+        "args": { "subscription_id": "sub_8831", "calculation": "prorated", "amount": "60.00" }
       }
     ],
     "trajectory_mode": "EXACT",
@@ -36,7 +36,7 @@
       },
       {
         "tool_name": "cancel_and_refund_subscription",
-        "args": { "subscription_id": "sub_8831", "calculation": "prorated" }
+        "args": { "subscription_id": "sub_8831", "calculation": "prorated", "amount": "60.00" }
       }
     ],
     "final_output": "Your annual subscription sub_8831 has been successfully cancelled. Based on the remaining 6 months of your term, a prorated refund of $60.00 has been initiated and should reflect on your statement in 3-5 business days.",

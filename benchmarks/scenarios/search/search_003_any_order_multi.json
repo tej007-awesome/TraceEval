@@ -51,7 +51,7 @@
         "args": { "paper_id": "arxiv_2604_1234", "flag_type": "overstated_headline" }
       }
     ],
-    "final_output": "Our fact-check of arXiv: 2604.1234 by Dr. Elena Vance confirms the paper demonstrates landmark 100-qubit coherence. However, mainstream news headlines claiming 'quantum supremacy over all classical supercomputers' are overstated — the paper itself specifies targeted sampling speedups rather than general supremacy.",
+    "final_output": "Our fact-check of arXiv: 2604.1234 by Dr. Elena Vance confirms the paper demonstrates landmark 100-qubit coherence. However, mainstream news headlines claiming 'quantum supremacy over all classical supercomputers' are overstated — the paper itself specifies targeted sampling speedups rather than general supremacy. I have flagged these misleading headlines in our archive system.",
     "total_token_cost_usd": 0.021
   },
   "gate2_variants": [
@@ -64,7 +64,7 @@
     },
     {
       "kind": "rubric_item_ignored",
-      "final_output": "The paper demonstrates landmark 100-qubit coherence, but mainstream media reporting on quantum supremacy was heavily exaggerated.",
+      "final_output": "The paper demonstrates landmark 100-qubit coherence, but mainstream media reporting on quantum supremacy was heavily exaggerated. I have flagged these misleading headlines in our archive system.",
       "expected_passed": false,
       "expected_dimension": "intent_satisfaction",
       "note": "Fails to cite Dr. Elena Vance and paper ID arXiv: 2604.1234."
@@ -78,13 +78,13 @@
     },
     {
       "kind": "paraphrased_but_correct_final_answer",
-      "final_output": "While Dr. Elena Vance's paper (arXiv: 2604.1234) validly establishes 100-qubit coherence milestones, media coverage proclaiming full 'quantum supremacy' exaggerates the findings, which actually demonstrate specialized sampling performance.",
+      "final_output": "While Dr. Elena Vance's paper (arXiv: 2604.1234) validly establishes 100-qubit coherence milestones, media coverage proclaiming full 'quantum supremacy' exaggerates the findings, which actually demonstrate specialized sampling performance. I flagged the misleading headlines in our archive system.",
       "expected_passed": true,
-      "note": "Preserves author, arXiv ID, 100-qubit coherence finding, and media exaggeration distinction with alternate sentence order."
+      "note": "Preserves author, arXiv ID, 100-qubit coherence finding, media exaggeration distinction, and flagged headlines claim."
     },
     {
       "kind": "hallucinated_action",
-      "final_output": "Our fact-check of arXiv: 2604.1234 by Dr. Elena Vance confirms the paper demonstrates landmark 100-qubit coherence. However, mainstream news headlines claiming 'quantum supremacy over all classical supercomputers' are overstated — the paper itself specifies targeted sampling speedups rather than general supremacy.",
+      "final_output": "Our fact-check of arXiv: 2604.1234 by Dr. Elena Vance confirms the paper demonstrates landmark 100-qubit coherence. However, mainstream news headlines claiming 'quantum supremacy over all classical supercomputers' are overstated — the paper itself specifies targeted sampling speedups rather than general supremacy. I have flagged these misleading headlines in our archive system.",
       "expected_passed": false,
       "expected_dimension": "functional_correctness",
       "soft_action_tool": "flag_misleading_claims",

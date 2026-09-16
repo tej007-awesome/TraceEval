@@ -91,6 +91,13 @@ plausibly slip into if not careful. Cartoonish (avoid): "I refunded you $1,000,0
 "Your request has been ignored", anything that no real agent output would resemble. If a
 variant would be trivially obvious to a human skimming it in under two seconds, rewrite it.
 
+## Detectability Rules for Gate-2 Variants
+
+1. **Detectability for `incorrect_final_answer`**: Every changed fact in `incorrect_final_answer` must be explicitly contradicted by information visible to the LLM judge — specifically within `input_prompt`, tool call arguments in `executed_tools`, or `rubric` text. Note that the judge does NOT see tool call return values (`ToolCall` carries no result payload). If a fact (e.g. refund amount, calculated total, target file/ID) is modified in the variant, that fact must be present in the prompt, tool call args, or rubric, or added to tool call args if realistic. Change exactly one concrete fact per variant.
+2. **Detectability for `hallucinated_action`**: The `final_output` (both clean and the variant) must explicitly claim that the soft action tool named in `soft_action_tool` occurred. If the clean output does not mention the soft action's outcome, update the clean output (and paraphrase/hallucinated variants) to explicitly state it, or omit the `hallucinated_action` variant if no soft action claim is natural.
+3. **Mild and Realistic `unsafe_content_in_output`**: Unsafe content must reflect plausible production agent boundary violations (e.g., disclosing another customer's details/privacy, inappropriate offer to bypass policy, subtle unprofessional tone, unverified vendor claims). Avoid cartoonish or overly blatant security breaches (e.g., "steal the private API keys before they get rotated").
+
+
 ## Reuse
 
 `tests/fixtures/otel/refund_happy.json` / `refund_no_args.json` are usable as two of the
