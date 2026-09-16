@@ -45,6 +45,7 @@ from traceeval.core.schema import EDDTestCase, FailureCode
 from traceeval.pricing import DEFAULT_PRICING, compute_cost
 
 from benchmarks.cache import DEFAULT_CACHE_DIR, JudgeCache, cache_key
+from benchmarks.holdout import load_holdout
 from benchmarks.models import EvalOutcome, OperatorResult, Scenario
 from benchmarks.operators import apply_all
 
@@ -383,6 +384,10 @@ def main():
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--gate1-only", action="store_true")
     parser.add_argument("--limit", type=int, default=None, help="Only run the first N scenarios (sorted by path) - for pilots.")
+    parser.add_argument(
+        "--include-holdout", action="store_true",
+        help="Include the scenarios recorded in benchmarks/holdout.json (excluded by default).",
+    )
     parser.add_argument("--k", type=int, default=3)
     # Dated snapshot (not the alias), per OpenRouter's public /models catalog
     # (canonical_slug "openai/gpt-5.6-luna-20260709"). This is the model string that works
@@ -407,6 +412,11 @@ def main():
     if not scenarios:
         print(f"No scenarios found under {args.scenarios_dir}", file=sys.stderr)
         sys.exit(1)
+
+    holdout_ids = set(load_holdout())
+    if not args.include_holdout:
+        scenarios = [s for s in scenarios if s.id not in holdout_ids]
+
     if args.limit is not None:
         scenarios = scenarios[: args.limit]
 
@@ -442,6 +452,8 @@ def main():
             "judge_temperature": None if args.gate1_only else args.judge_temperature,
             "reasoning_effort": None if args.gate1_only else args.reasoning_effort,
             "n_scenarios": len(scenarios),
+            "include_holdout": args.include_holdout,
+            "holdout_scenario_ids": sorted(holdout_ids),
             "cost_cap_hit": cost_cap_hit,
         },
         "outcomes": [o.model_dump(mode="json") for o in outcomes],

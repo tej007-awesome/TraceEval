@@ -97,6 +97,14 @@ class Scenario(BaseModel):
     case: EDDTestCase
     trace: AgentTrace
     gate2_variants: List[Gate2Variant] = Field(default_factory=list)
+    independent_call_groups: Optional[List[List[str]]] = Field(
+        None,
+        description="Optional groups of tool_names in trace.executed_tools that have no "
+        "causal dependency on each other and can be freely reordered. Only used by the "
+        "reorder_under_any_order benign control, which is inapplicable to a scenario that "
+        "doesn't declare this - blindly shuffling the whole trajectory risks producing an "
+        "order a real agent couldn't actually take (e.g. a step before its prerequisite).",
+    )
 
     @model_validator(mode="after")
     def _validate_soft_action_tools(self) -> "Scenario":

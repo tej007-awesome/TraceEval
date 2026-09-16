@@ -59,11 +59,15 @@ def test_swapped_order_inapplicable_under_any_order_routes_to_benign(any_order_s
     assert result.applicable is False
     assert "ANY_ORDER" in result.inapplicable_reason
 
+    # reorder_under_any_order requires a scenario-declared independent_call_groups (see
+    # test_reorder_under_any_order_requires_independent_call_groups below); the
+    # any_order_scenario fixture doesn't declare one, so it's inapplicable here too - not
+    # "routes to benign and always succeeds."
     benign_func = dict(ALL_OPERATORS)["reorder_under_any_order"]
     rng2 = random.Random(1)
     benign_result = benign_func(any_order_scenario, rng2)
-    assert benign_result.applicable is True
-    assert benign_result.expected_passed is True
+    assert benign_result.applicable is False
+    assert "independent_call_groups" in benign_result.inapplicable_reason
 
 
 def test_duplicated_step_inapplicable_under_non_exact(in_order_scenario, any_order_scenario):
@@ -90,3 +94,118 @@ def test_apply_all_covers_every_registered_operator(in_order_scenario):
     results = apply_all(in_order_scenario, seed=0)
     operator_names = {r.operator for r in results}
     assert operator_names == {name for name, _ in ALL_OPERATORS}
+
+
+# --- regex_conforming_variable_value: final_output consistency fix ---
+
+
+def _scenario_with_token_in_final_output():
+    # _conforming_alt_value only recognizes the sess_[a-f0-9]{N} and URL-prefix pattern
+    # shapes - use one of those, not an arbitrary pattern, so the operator is applicable.
+    from benchmarks.models import Scenario
+    from traceeval.core.schema import AgentTrace, EDDTestCase, ExpectedToolCall, ToolCall
+
+    return Scenario(
+        id="synthetic_token", domain="refunds",
+        case=EDDTestCase(
+            case_id="c1", input_prompt="p",
+            expected_tool_calls=[ExpectedToolCall(
+                tool_name="check_token", args={"token": "^sess_[a-f0-9]{4}$"},
+                arg_match_mode="EXACT", field_overrides={"token": "REGEX"},
+            )],
+            rubric=["Confirms the check was performed."],
+        ),
+        trace=AgentTrace(
+            session_id="s", triggered_skills=[],
+            executed_tools=[ToolCall(tool_name="check_token", args={"token": "sess_ab12"})],
+            final_output="I verified this using token sess_ab12 and it checked out.",
+            total_token_cost_usd=0.01,
+        ),
+    )
+
+
+def test_regex_conforming_variable_value_replaces_old_value_in_final_output():
+    scenario = _scenario_with_token_in_final_output()
+    func = dict(ALL_OPERATORS)["regex_conforming_variable_value"]
+    rng = random.Random(1)
+    result = func(scenario, rng)
+    assert result.applicable is True
+    new_token = result.mutated_trace.executed_tools[0].args["token"]
+    assert new_token != "sess_ab12"
+    assert "sess_ab12" not in result.mutated_trace.final_output
+    assert new_token in result.mutated_trace.final_output
+    assert "updated to match" in result.label
+
+
+def test_regex_conforming_variable_value_notes_when_final_output_unaffected(in_order_scenario):
+    # refund_001's clean final_output never mentions the session token literal, so the
+    # replacement is a no-op there - confirm the label says so rather than silently omitting it.
+    func = dict(ALL_OPERATORS)["regex_conforming_variable_value"]
+    rng = random.Random(1)
+    result = func(in_order_scenario, rng)
+    assert result.applicable is True
+    assert "unchanged (old value not present)" in result.label
+
+
+# --- reorder_under_any_order: independent_call_groups ---
+
+
+def test_reorder_under_any_order_requires_independent_call_groups():
+    from benchmarks.models import Scenario
+    from traceeval.core.schema import AgentTrace, EDDTestCase, ExpectedToolCall, ToolCall, TrajectoryMode
+
+    scenario = Scenario(
+        id="synthetic_no_groups", domain="refunds",
+        case=EDDTestCase(
+            case_id="c1", input_prompt="p",
+            expected_tool_calls=[
+                ExpectedToolCall(tool_name="a", args={}), ExpectedToolCall(tool_name="b", args={}),
+            ],
+            trajectory_mode=TrajectoryMode.ANY_ORDER, rubric=["r"],
+        ),
+        trace=AgentTrace(
+            session_id="s", triggered_skills=[],
+            executed_tools=[ToolCall(tool_name="a", args={}), ToolCall(tool_name="b", args={})],
+            final_output="done", total_token_cost_usd=0.01,
+        ),
+        # independent_call_groups intentionally omitted
+    )
+    func = dict(ALL_OPERATORS)["reorder_under_any_order"]
+    result = func(scenario, random.Random(1))
+    assert result.applicable is False
+    assert "independent_call_groups" in result.inapplicable_reason
+
+
+def test_reorder_under_any_order_only_shuffles_within_declared_group():
+    from benchmarks.models import Scenario
+    from traceeval.core.schema import AgentTrace, EDDTestCase, ExpectedToolCall, ToolCall, TrajectoryMode
+
+    # "verify" must always come first (a real dependency); "a" and "b" are independent of
+    # each other and declared as such - only they may be reordered.
+    scenario = Scenario(
+        id="synthetic_groups", domain="refunds",
+        case=EDDTestCase(
+            case_id="c1", input_prompt="p",
+            expected_tool_calls=[
+                ExpectedToolCall(tool_name="verify", args={}),
+                ExpectedToolCall(tool_name="a", args={}),
+                ExpectedToolCall(tool_name="b", args={}),
+            ],
+            trajectory_mode=TrajectoryMode.ANY_ORDER, rubric=["r"],
+        ),
+        trace=AgentTrace(
+            session_id="s", triggered_skills=[],
+            executed_tools=[
+                ToolCall(tool_name="verify", args={}), ToolCall(tool_name="a", args={}), ToolCall(tool_name="b", args={}),
+            ],
+            final_output="done", total_token_cost_usd=0.01,
+        ),
+        independent_call_groups=[["a", "b"]],
+    )
+    func = dict(ALL_OPERATORS)["reorder_under_any_order"]
+    result = func(scenario, random.Random(1))
+    assert result.applicable is True
+    names = [tc.tool_name for tc in result.mutated_trace.executed_tools]
+    assert names[0] == "verify"  # never moved - not in any declared group
+    assert set(names[1:]) == {"a", "b"}  # only the declared group's members swapped
+    assert names != ["verify", "a", "b"]  # order genuinely changed

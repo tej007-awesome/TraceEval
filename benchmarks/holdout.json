@@ -1,0 +1,10 @@
+{
+  "seed": 20260916,
+  "scenario_ids": [
+    "code_tools_001_in_order_subset",
+    "file_ops_004_in_order_any",
+    "refund_002_any_order",
+    "scheduling_001_in_order_regex",
+    "search_003_any_order_multi"
+  ]
+}

@@ -422,24 +422,51 @@ def extra_args_under_subset(scenario: Scenario, rng: random.Random) -> OperatorR
 
 
 def reorder_under_any_order(scenario: Scenario, rng: random.Random) -> OperatorResult:
+    """Only permutes calls within a scenario-declared independent_call_groups group - never
+    the whole trajectory. Without a declared group, blindly shuffling risks moving a call
+    before a real prerequisite it causally depends on (e.g. issuing a refund before looking
+    up the order), which would make the "should still pass" label simply wrong. A scenario
+    that doesn't declare independent_call_groups is inapplicable here, not silently
+    downgraded to unsafe full-shuffle behavior."""
     name = "reorder_under_any_order"
     if scenario.case.trajectory_mode != TrajectoryMode.ANY_ORDER:
         return _inapplicable(scenario, name, "benign", "only applicable under ANY_ORDER")
+    groups = scenario.independent_call_groups
+    if not groups:
+        return _inapplicable(
+            scenario, name, "benign",
+            "scenario does not declare independent_call_groups - reordering without a "
+            "declared causal-independence group risks producing an invalid trajectory",
+        )
     trace = scenario.trace.model_copy(deep=True)
-    if len(trace.executed_tools) < 2:
-        return _inapplicable(scenario, name, "benign", "fewer than 2 executed tool calls")
-    original_order = list(trace.executed_tools)
-    for _ in range(10):
-        rng.shuffle(trace.executed_tools)
-        if trace.executed_tools != original_order:
-            break
-    else:
-        # len==2 edge case where shuffle kept landing on the same order - force the swap.
-        trace.executed_tools[0], trace.executed_tools[1] = trace.executed_tools[1], trace.executed_tools[0]
+    changed = False
+    for group in groups:
+        group_set = set(group)
+        indices = [i for i, tc in enumerate(trace.executed_tools) if tc.tool_name in group_set]
+        if len(indices) < 2:
+            continue
+        items = [trace.executed_tools[i] for i in indices]
+        original_names = [tc.tool_name for tc in items]
+        shuffled = list(items)
+        for _ in range(10):
+            rng.shuffle(shuffled)
+            if [tc.tool_name for tc in shuffled] != original_names:
+                break
+        if [tc.tool_name for tc in shuffled] == original_names:
+            continue  # this group never produced a different order (e.g. duplicate names)
+        for i, tc in zip(indices, shuffled):
+            trace.executed_tools[i] = tc
+        changed = True
+    if not changed:
+        return _inapplicable(
+            scenario, name, "benign",
+            "no declared independent_call_groups produced a different order for this trace",
+        )
     return OperatorResult(
         scenario_id=scenario.id, domain=scenario.domain, operator=name, category="benign", applicable=True,
         mutated_case=scenario.case, mutated_trace=trace,
-        expected_passed=True, expected_gate="gate1", label="reordered executed_tools",
+        expected_passed=True, expected_gate="gate1",
+        label=f"reordered within independent_call_groups={groups}",
     )
 
 
@@ -480,11 +507,26 @@ def regex_conforming_variable_value(scenario: Scenario, rng: random.Random) -> O
     if new_val is None:
         return _inapplicable(scenario, name, "benign", f"no known conforming-value generator for pattern {pattern!r}")
     trace.executed_tools[idx].args[key] = new_val
+
+    # Keep the scenario internally consistent: replace every occurrence of the OLD value in
+    # final_output too, so the benign arg-value swap doesn't create a spurious contradiction
+    # between what the trace shows and what the agent's own answer claims (see
+    # scenarios/AUTHORING.md's rubric-hardcoding lint check for the rubric side of this -
+    # this operator deliberately does NOT edit the rubric, only the trace it's mutating).
+    old_str, new_str = str(current), str(new_val)
+    final_output_updated = False
+    if old_str in trace.final_output:
+        trace.final_output = trace.final_output.replace(old_str, new_str)
+        final_output_updated = True
+
     return OperatorResult(
         scenario_id=scenario.id, domain=scenario.domain, operator=name, category="benign", applicable=True,
         mutated_case=scenario.case, mutated_trace=trace,
         expected_passed=True, expected_gate="gate1",
-        label=f"{trace.executed_tools[idx].tool_name}.{key}: {current!r} -> {new_val!r} (still matches {pattern!r})",
+        label=(
+            f"{trace.executed_tools[idx].tool_name}.{key}: {current!r} -> {new_val!r} "
+            f"(still matches {pattern!r}); final_output {'updated to match' if final_output_updated else 'unchanged (old value not present)'}"
+        ),
     )
 
 
