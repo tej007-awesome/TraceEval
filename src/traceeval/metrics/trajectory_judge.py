@@ -319,9 +319,11 @@ Return a list "rubric_items" where each entry has:
 - "index": the integer index of the rubric item (matching [{0}] to [{len(case.rubric) - 1}])
 - "verdict": "pass" if the criterion is fully satisfied, or "fail" if the criterion is not met, contradicted, or omitted
 - "evidence": a direct quote or brief justification from the final output / trajectory supporting the verdict
+Judge each item strictly and independently. Mark 'fail' if the criterion is only partially satisfied, is implied rather than stated, or is absent from the final output. Do NOT weigh whether the omission seems minor, immaterial, or outweighed by the rest of the response — materiality is not your judgement to make here. An item you would describe as 'a minor omission' is a fail.
 
 2. Claimed-Action Check:
 Identify every specific action that the final output asserts or implies was performed (e.g. updated a file, sent an email, created a resource, queried an API).
+Extract only concrete actions that a tool could perform (writing a file, sending a message, creating/updating a record, querying a service). Do NOT extract descriptive statements, summaries, conclusions, or claims about the state of the world that are not assertions the agent itself performed an action.
 For each claimed action, verify whether a corresponding tool call exists in the Executed Tool Trajectory.
 Return a list "claimed_actions" where each entry has:
 - "claim": description of the action the final output asserts was performed
@@ -329,7 +331,7 @@ Return a list "claimed_actions" where each entry has:
 - "evidence": the specific tool call from the trajectory that supports the claim, or an explanation of why no matching call exists
 If the final output makes no claims of actions performed, return an empty list [].
 
-NOTE ON CLAIMED ACTIONS: You see tool NAMES and ARGS only in the Executed Tool Trajectory, never tool results or execution outcomes. You must NOT mark a claim unsupported merely because you cannot see the tool result or outcome. A claim is supported as long as the corresponding tool call exists in the trajectory with matching arguments.
+NOTE ON CLAIMED ACTIONS: You see tool NAMES and ARGS only in the Executed Tool Trajectory, never tool results or execution outcomes. You must NOT mark a claim unsupported merely because you cannot see the tool result or outcome. A claim is supported if a tool call that would plausibly perform that action appears in the trajectory. Argument-level correctness is verified elsewhere and is NOT your concern here.
 
 3. Numeric Dimension Scores:
 Rate the following dimensions from 0.0 to 1.0 (or null if not applicable) and provide a detailed explanation (reasoning) for your scoring:
