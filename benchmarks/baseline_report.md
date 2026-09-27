@@ -2,7 +2,7 @@
 
 ## Config
 
-- **commit_sha**: a3cc79136d1f48d451e98202bc50e9f86c0f7697
+- **commit_sha**: ab36dfab7c89d66eda73bc0ead13dc593c007369
 - **seed**: 0
 - **gate1_only**: False
 - **k**: 3
@@ -35,9 +35,9 @@ Gate-1 fault metrics are a regression guard on deterministic code, not a headlin
 | duplicated_step | gate1_fault | 4 | 100% [51%, 100%] (n=4) | 100% [51%, 100%] (n=4) |
 | forbidden_args_injected | gate1_fault | 13 | 100% [77%, 100%] (n=13) | 100% [77%, 100%] (n=13) |
 | forbidden_tool_inserted | gate1_fault | 15 | 100% [80%, 100%] (n=15) | 100% [80%, 100%] (n=15) |
-| incorrect_final_answer | gate2_fault | 45 | 98% [88%, 100%] (n=45) | 100% [92%, 100%] (n=44) |
+| incorrect_final_answer | gate2_fault | 45 | 100% [92%, 100%] (n=45) | 100% [92%, 100%] (n=45) |
 | missing_required_arg | gate1_fault | 15 | 100% [80%, 100%] (n=15) | 100% [80%, 100%] (n=15) |
-| rubric_item_ignored | gate2_fault | 45 | 24% [14%, 39%] (n=45) | 100% [74%, 100%] (n=11) |
+| rubric_item_ignored | gate2_fault | 45 | 40% [27%, 55%] (n=45) | 100% [82%, 100%] (n=18) |
 | skill_not_triggered | gate1_fault | 15 | 100% [80%, 100%] (n=15) | 100% [80%, 100%] (n=15) |
 | skipped_step | gate1_fault | 15 | 100% [80%, 100%] (n=15) | 100% [80%, 100%] (n=15) |
 | swapped_order | gate1_fault | 8 | 100% [68%, 100%] (n=8) | 100% [68%, 100%] (n=8) |
@@ -64,9 +64,9 @@ Does the FULL pipeline (gate 1 + gate 2 combined) incorrectly fail something tha
 
 | Operator | n | Pipeline FP rate (95% CI) |
 |---|---|---|
-| clean_base | 45 | 11% [5%, 23%] (n=45) |
-| extra_args_under_subset | 33 | 12% [5%, 27%] (n=33) |
-| paraphrased_but_correct_final_answer | 45 | 7% [2%, 18%] (n=45) |
+| clean_base | 45 | 7% [2%, 18%] (n=45) |
+| extra_args_under_subset | 33 | 9% [3%, 24%] (n=33) |
+| paraphrased_but_correct_final_answer | 45 | 9% [4%, 21%] (n=45) |
 | regex_conforming_variable_value | 12 | 25% [9%, 53%] (n=12) |
 | reorder_under_any_order | 12 | 0% [0%, 24%] (n=12) |
 
@@ -74,21 +74,19 @@ Does the FULL pipeline (gate 1 + gate 2 combined) incorrectly fail something tha
 
 | Scenario | Operator | k | Failing gate | Codes | Dimensions |
 |---|---|---|---|---|---|
-| file_ops_002_any_order_regex | clean_base | 1 | gate2 | JUDGE_BELOW_THRESHOLD | functional_correctness |
-| file_ops_002_any_order_regex | extra_args_under_subset | 0 | gate2 | JUDGE_BELOW_THRESHOLD | trajectory_quality |
-| scheduling_003_any_order_any | clean_base | 2 | gate2 | JUDGE_BELOW_THRESHOLD | trajectory_quality |
-| search_001_in_order_regex | clean_base | 0 | gate2 | JUDGE_BELOW_THRESHOLD, JUDGE_BELOW_THRESHOLD, JUDGE_BELOW_THRESHOLD, JUDGE_BELOW_THRESHOLD | intent_satisfaction, functional_correctness, trajectory_quality, cost_efficiency |
+| file_ops_001_in_order_subset | paraphrased_but_correct_final_answer | 2 | gate2 | JUDGE_BELOW_THRESHOLD | trajectory_quality |
 | search_001_in_order_regex | clean_base | 1 | gate2 | JUDGE_BELOW_THRESHOLD, JUDGE_BELOW_THRESHOLD, JUDGE_BELOW_THRESHOLD, JUDGE_BELOW_THRESHOLD | intent_satisfaction, functional_correctness, trajectory_quality, cost_efficiency |
+| search_001_in_order_regex | clean_base | 0 | gate2 | JUDGE_BELOW_THRESHOLD, JUDGE_BELOW_THRESHOLD, JUDGE_BELOW_THRESHOLD, JUDGE_BELOW_THRESHOLD | intent_satisfaction, functional_correctness, trajectory_quality, cost_efficiency |
 | search_001_in_order_regex | clean_base | 2 | gate2 | JUDGE_BELOW_THRESHOLD, JUDGE_BELOW_THRESHOLD, JUDGE_BELOW_THRESHOLD, JUDGE_BELOW_THRESHOLD | intent_satisfaction, functional_correctness, trajectory_quality, cost_efficiency |
 | search_001_in_order_regex | extra_args_under_subset | 0 | gate2 | JUDGE_BELOW_THRESHOLD, JUDGE_BELOW_THRESHOLD, JUDGE_BELOW_THRESHOLD, JUDGE_BELOW_THRESHOLD | intent_satisfaction, functional_correctness, trajectory_quality, cost_efficiency |
-| search_001_in_order_regex | extra_args_under_subset | 1 | gate2 | JUDGE_BELOW_THRESHOLD, JUDGE_BELOW_THRESHOLD, JUDGE_BELOW_THRESHOLD, JUDGE_BELOW_THRESHOLD | intent_satisfaction, functional_correctness, trajectory_quality, cost_efficiency |
-| search_001_in_order_regex | extra_args_under_subset | 2 | gate2 | JUDGE_BELOW_THRESHOLD, JUDGE_BELOW_THRESHOLD, JUDGE_BELOW_THRESHOLD, JUDGE_BELOW_THRESHOLD | intent_satisfaction, functional_correctness, trajectory_quality, cost_efficiency |
 | search_001_in_order_regex | regex_conforming_variable_value | 0 | gate2 | JUDGE_BELOW_THRESHOLD, JUDGE_BELOW_THRESHOLD, JUDGE_BELOW_THRESHOLD, JUDGE_BELOW_THRESHOLD | intent_satisfaction, functional_correctness, trajectory_quality, cost_efficiency |
+| search_001_in_order_regex | extra_args_under_subset | 2 | gate2 | JUDGE_BELOW_THRESHOLD, JUDGE_BELOW_THRESHOLD, JUDGE_BELOW_THRESHOLD, JUDGE_BELOW_THRESHOLD | intent_satisfaction, functional_correctness, trajectory_quality, cost_efficiency |
+| search_001_in_order_regex | extra_args_under_subset | 1 | gate2 | JUDGE_BELOW_THRESHOLD, JUDGE_BELOW_THRESHOLD, JUDGE_BELOW_THRESHOLD, JUDGE_BELOW_THRESHOLD | intent_satisfaction, functional_correctness, trajectory_quality, cost_efficiency |
 | search_001_in_order_regex | regex_conforming_variable_value | 1 | gate2 | JUDGE_BELOW_THRESHOLD, JUDGE_BELOW_THRESHOLD, JUDGE_BELOW_THRESHOLD, JUDGE_BELOW_THRESHOLD | intent_satisfaction, functional_correctness, trajectory_quality, cost_efficiency |
-| search_001_in_order_regex | paraphrased_but_correct_final_answer | 0 | gate2 | JUDGE_BELOW_THRESHOLD, JUDGE_BELOW_THRESHOLD, JUDGE_BELOW_THRESHOLD, JUDGE_BELOW_THRESHOLD | intent_satisfaction, functional_correctness, trajectory_quality, cost_efficiency |
 | search_001_in_order_regex | regex_conforming_variable_value | 2 | gate2 | JUDGE_BELOW_THRESHOLD, JUDGE_BELOW_THRESHOLD, JUDGE_BELOW_THRESHOLD, JUDGE_BELOW_THRESHOLD | intent_satisfaction, functional_correctness, trajectory_quality, cost_efficiency |
+| search_001_in_order_regex | paraphrased_but_correct_final_answer | 0 | gate2 | JUDGE_BELOW_THRESHOLD, JUDGE_BELOW_THRESHOLD, JUDGE_BELOW_THRESHOLD, JUDGE_BELOW_THRESHOLD | intent_satisfaction, functional_correctness, trajectory_quality, cost_efficiency |
 | search_001_in_order_regex | paraphrased_but_correct_final_answer | 1 | gate2 | JUDGE_BELOW_THRESHOLD, JUDGE_BELOW_THRESHOLD, JUDGE_BELOW_THRESHOLD, JUDGE_BELOW_THRESHOLD | intent_satisfaction, functional_correctness, trajectory_quality, cost_efficiency |
-| search_001_in_order_regex | paraphrased_but_correct_final_answer | 2 | gate2 | JUDGE_BELOW_THRESHOLD, JUDGE_BELOW_THRESHOLD, JUDGE_BELOW_THRESHOLD | intent_satisfaction, functional_correctness, trajectory_quality |
+| search_001_in_order_regex | paraphrased_but_correct_final_answer | 2 | gate2 | JUDGE_BELOW_THRESHOLD, JUDGE_BELOW_THRESHOLD, JUDGE_BELOW_THRESHOLD, JUDGE_BELOW_THRESHOLD | intent_satisfaction, functional_correctness, trajectory_quality, cost_efficiency |
 
 #### Gate-2 misses (detail)
 
@@ -96,71 +94,62 @@ Fault operators the pipeline failed to catch at all (expected to fail, but passe
 
 | Scenario | Operator | k | Expected code | Expected dimensions |
 |---|---|---|---|---|
-| code_tools_002_any_order_regex | rubric_item_ignored | 0 | JUDGE_BELOW_THRESHOLD | intent_satisfaction, functional_correctness |
+| code_tools_002_any_order_regex | rubric_item_ignored | 1 | JUDGE_BELOW_THRESHOLD | intent_satisfaction, functional_correctness |
 | code_tools_002_any_order_regex | rubric_item_ignored | 2 | JUDGE_BELOW_THRESHOLD | intent_satisfaction, functional_correctness |
-| code_tools_003_any_order_subset | rubric_item_ignored | 1 | JUDGE_BELOW_THRESHOLD | intent_satisfaction, functional_correctness |
 | code_tools_003_any_order_subset | rubric_item_ignored | 0 | JUDGE_BELOW_THRESHOLD | intent_satisfaction, functional_correctness |
+| code_tools_003_any_order_subset | rubric_item_ignored | 1 | JUDGE_BELOW_THRESHOLD | intent_satisfaction, functional_correctness |
 | code_tools_003_any_order_subset | rubric_item_ignored | 2 | JUDGE_BELOW_THRESHOLD | intent_satisfaction, functional_correctness |
-| code_tools_003_any_order_subset | hallucinated_action | 1 | JUDGE_BELOW_THRESHOLD | functional_correctness, trajectory_quality |
-| code_tools_004_exact_mode | rubric_item_ignored | 0 | JUDGE_BELOW_THRESHOLD | intent_satisfaction, functional_correctness |
 | code_tools_004_exact_mode | rubric_item_ignored | 2 | JUDGE_BELOW_THRESHOLD | intent_satisfaction, functional_correctness |
+| file_ops_001_in_order_subset | rubric_item_ignored | 1 | JUDGE_BELOW_THRESHOLD | intent_satisfaction, functional_correctness |
 | file_ops_001_in_order_subset | hallucinated_action | 0 | JUDGE_BELOW_THRESHOLD | functional_correctness, trajectory_quality |
 | file_ops_001_in_order_subset | hallucinated_action | 2 | JUDGE_BELOW_THRESHOLD | functional_correctness, trajectory_quality |
-| file_ops_002_any_order_regex | rubric_item_ignored | 1 | JUDGE_BELOW_THRESHOLD | intent_satisfaction, functional_correctness |
 | file_ops_002_any_order_regex | rubric_item_ignored | 0 | JUDGE_BELOW_THRESHOLD | intent_satisfaction, functional_correctness |
+| file_ops_002_any_order_regex | rubric_item_ignored | 1 | JUDGE_BELOW_THRESHOLD | intent_satisfaction, functional_correctness |
 | file_ops_002_any_order_regex | rubric_item_ignored | 2 | JUDGE_BELOW_THRESHOLD | intent_satisfaction, functional_correctness |
-| file_ops_002_any_order_regex | hallucinated_action | 2 | JUDGE_BELOW_THRESHOLD | functional_correctness, trajectory_quality |
-| file_ops_002_any_order_regex | hallucinated_action | 1 | JUDGE_BELOW_THRESHOLD | functional_correctness, trajectory_quality |
 | file_ops_002_any_order_regex | hallucinated_action | 0 | JUDGE_BELOW_THRESHOLD | functional_correctness, trajectory_quality |
-| file_ops_003_any_order_subset | rubric_item_ignored | 0 | JUDGE_BELOW_THRESHOLD | intent_satisfaction, functional_correctness |
-| file_ops_003_any_order_subset | rubric_item_ignored | 1 | JUDGE_BELOW_THRESHOLD | intent_satisfaction, functional_correctness |
+| file_ops_002_any_order_regex | hallucinated_action | 1 | JUDGE_BELOW_THRESHOLD | functional_correctness, trajectory_quality |
+| file_ops_002_any_order_regex | hallucinated_action | 2 | JUDGE_BELOW_THRESHOLD | functional_correctness, trajectory_quality |
 | file_ops_003_any_order_subset | rubric_item_ignored | 2 | JUDGE_BELOW_THRESHOLD | intent_satisfaction, functional_correctness |
+| file_ops_003_any_order_subset | rubric_item_ignored | 1 | JUDGE_BELOW_THRESHOLD | intent_satisfaction, functional_correctness |
+| file_ops_003_any_order_subset | rubric_item_ignored | 0 | JUDGE_BELOW_THRESHOLD | intent_satisfaction, functional_correctness |
+| file_ops_003_any_order_subset | hallucinated_action | 0 | JUDGE_BELOW_THRESHOLD | functional_correctness, trajectory_quality |
 | file_ops_003_any_order_subset | hallucinated_action | 1 | JUDGE_BELOW_THRESHOLD | functional_correctness, trajectory_quality |
 | file_ops_003_any_order_subset | hallucinated_action | 2 | JUDGE_BELOW_THRESHOLD | functional_correctness, trajectory_quality |
-| file_ops_003_any_order_subset | hallucinated_action | 0 | JUDGE_BELOW_THRESHOLD | functional_correctness, trajectory_quality |
-| refund_001_in_order_subset_regex | rubric_item_ignored | 0 | JUDGE_BELOW_THRESHOLD | intent_satisfaction, functional_correctness |
-| refund_001_in_order_subset_regex | rubric_item_ignored | 1 | JUDGE_BELOW_THRESHOLD | intent_satisfaction, functional_correctness |
 | refund_001_in_order_subset_regex | rubric_item_ignored | 2 | JUDGE_BELOW_THRESHOLD | intent_satisfaction, functional_correctness |
-| refund_001_in_order_subset_regex | hallucinated_action | 0 | JUDGE_BELOW_THRESHOLD | functional_correctness, trajectory_quality |
+| refund_001_in_order_subset_regex | rubric_item_ignored | 1 | JUDGE_BELOW_THRESHOLD | intent_satisfaction, functional_correctness |
+| refund_001_in_order_subset_regex | rubric_item_ignored | 0 | JUDGE_BELOW_THRESHOLD | intent_satisfaction, functional_correctness |
 | refund_001_in_order_subset_regex | hallucinated_action | 1 | JUDGE_BELOW_THRESHOLD | functional_correctness, trajectory_quality |
+| refund_001_in_order_subset_regex | hallucinated_action | 0 | JUDGE_BELOW_THRESHOLD | functional_correctness, trajectory_quality |
 | refund_001_in_order_subset_regex | hallucinated_action | 2 | JUDGE_BELOW_THRESHOLD | functional_correctness, trajectory_quality |
-| refund_003_exact_mode | incorrect_final_answer | 1 | JUDGE_BELOW_THRESHOLD | functional_correctness |
-| refund_003_exact_mode | rubric_item_ignored | 0 | JUDGE_BELOW_THRESHOLD | intent_satisfaction, functional_correctness |
 | refund_003_exact_mode | rubric_item_ignored | 1 | JUDGE_BELOW_THRESHOLD | intent_satisfaction, functional_correctness |
+| refund_003_exact_mode | rubric_item_ignored | 0 | JUDGE_BELOW_THRESHOLD | intent_satisfaction, functional_correctness |
 | refund_003_exact_mode | rubric_item_ignored | 2 | JUDGE_BELOW_THRESHOLD | intent_satisfaction, functional_correctness |
 | refund_004_dispute_subset | rubric_item_ignored | 1 | JUDGE_BELOW_THRESHOLD | intent_satisfaction, functional_correctness |
-| refund_004_dispute_subset | hallucinated_action | 2 | JUDGE_BELOW_THRESHOLD | functional_correctness, trajectory_quality |
 | refund_004_dispute_subset | hallucinated_action | 1 | JUDGE_BELOW_THRESHOLD | functional_correctness, trajectory_quality |
 | refund_004_dispute_subset | hallucinated_action | 0 | JUDGE_BELOW_THRESHOLD | functional_correctness, trajectory_quality |
+| refund_004_dispute_subset | hallucinated_action | 2 | JUDGE_BELOW_THRESHOLD | functional_correctness, trajectory_quality |
 | scheduling_002_any_order_subset | rubric_item_ignored | 1 | JUDGE_BELOW_THRESHOLD | intent_satisfaction, functional_correctness |
 | scheduling_002_any_order_subset | rubric_item_ignored | 0 | JUDGE_BELOW_THRESHOLD | intent_satisfaction, functional_correctness |
 | scheduling_002_any_order_subset | rubric_item_ignored | 2 | JUDGE_BELOW_THRESHOLD | intent_satisfaction, functional_correctness |
 | scheduling_002_any_order_subset | hallucinated_action | 0 | JUDGE_BELOW_THRESHOLD | functional_correctness, trajectory_quality |
 | scheduling_002_any_order_subset | hallucinated_action | 1 | JUDGE_BELOW_THRESHOLD | functional_correctness, trajectory_quality |
 | scheduling_002_any_order_subset | hallucinated_action | 2 | JUDGE_BELOW_THRESHOLD | functional_correctness, trajectory_quality |
-| scheduling_003_any_order_any | rubric_item_ignored | 0 | JUDGE_BELOW_THRESHOLD | intent_satisfaction, functional_correctness |
-| scheduling_003_any_order_any | rubric_item_ignored | 1 | JUDGE_BELOW_THRESHOLD | intent_satisfaction, functional_correctness |
+| scheduling_003_any_order_any | rubric_item_ignored | 2 | JUDGE_BELOW_THRESHOLD | intent_satisfaction, functional_correctness |
 | scheduling_003_any_order_any | hallucinated_action | 0 | JUDGE_BELOW_THRESHOLD | functional_correctness, trajectory_quality |
-| scheduling_003_any_order_any | hallucinated_action | 2 | JUDGE_BELOW_THRESHOLD | functional_correctness, trajectory_quality |
+| scheduling_003_any_order_any | rubric_item_ignored | 1 | JUDGE_BELOW_THRESHOLD | intent_satisfaction, functional_correctness |
 | scheduling_003_any_order_any | hallucinated_action | 1 | JUDGE_BELOW_THRESHOLD | functional_correctness, trajectory_quality |
-| scheduling_004_exact_mode | rubric_item_ignored | 0 | JUDGE_BELOW_THRESHOLD | intent_satisfaction, functional_correctness |
+| scheduling_003_any_order_any | hallucinated_action | 2 | JUDGE_BELOW_THRESHOLD | functional_correctness, trajectory_quality |
 | scheduling_004_exact_mode | rubric_item_ignored | 1 | JUDGE_BELOW_THRESHOLD | intent_satisfaction, functional_correctness |
 | scheduling_004_exact_mode | rubric_item_ignored | 2 | JUDGE_BELOW_THRESHOLD | intent_satisfaction, functional_correctness |
-| search_002_any_order_subset | rubric_item_ignored | 0 | JUDGE_BELOW_THRESHOLD | intent_satisfaction, functional_correctness |
-| search_002_any_order_subset | rubric_item_ignored | 1 | JUDGE_BELOW_THRESHOLD | intent_satisfaction, functional_correctness |
-| search_002_any_order_subset | rubric_item_ignored | 2 | JUDGE_BELOW_THRESHOLD | intent_satisfaction, functional_correctness |
 | search_002_any_order_subset | hallucinated_action | 0 | JUDGE_BELOW_THRESHOLD | functional_correctness, trajectory_quality |
-| search_002_any_order_subset | hallucinated_action | 1 | JUDGE_BELOW_THRESHOLD | functional_correctness, trajectory_quality |
 | search_002_any_order_subset | hallucinated_action | 2 | JUDGE_BELOW_THRESHOLD | functional_correctness, trajectory_quality |
-| search_004_exact_mode | rubric_item_ignored | 2 | JUDGE_BELOW_THRESHOLD | intent_satisfaction, functional_correctness |
-| search_004_exact_mode | rubric_item_ignored | 0 | JUDGE_BELOW_THRESHOLD | intent_satisfaction, functional_correctness |
-| search_004_exact_mode | rubric_item_ignored | 1 | JUDGE_BELOW_THRESHOLD | intent_satisfaction, functional_correctness |
+| search_002_any_order_subset | hallucinated_action | 1 | JUDGE_BELOW_THRESHOLD | functional_correctness, trajectory_quality |
 
 #### hallucinated_action (separate table — see plan caveat)
 
 Reported separately: gate 1 never sees this fault by construction (the removed tool call is never in `expected_tool_calls`), so its detection rate reflects the judge alone, not the gate-1+gate-2 pipeline the other operators measure.
 
-- n=33, detection rate: 27% [15%, 44%] (n=33), attribution: 100% [70%, 100%] (n=9)
+- n=33, detection rate: 30% [17%, 47%] (n=33), attribution: 100% [72%, 100%] (n=10)
 
 #### Judge error rate by operator
 
@@ -178,20 +167,20 @@ Reported separately: gate 1 never sees this fault by construction (the removed t
 
 #### Gate-1 contribution
 
-- Total detections: 256
-- Caught by gate 1 alone: 147 (57%)
+- Total detections: 265
+- Caught by gate 1 alone: 147 (55%)
 - LLM calls avoided by gate-1 short-circuit: 147
 
 #### Judge flip rate (k repeats)
 
 - Scenario/operator groups with k≥2 judged: 105
-- Groups with a non-unanimous verdict: 10 (10%)
+- Groups with a non-unanimous verdict: 8 (8%)
 
 #### Judge cost / latency
 
 - Judged items (excluding cache hits): 315
-- Mean cost per judged item: $0.000322
-- Mean latency per judged item: 3302 ms
+- Mean cost per judged item: $0.000318
+- Mean latency per judged item: 2560 ms
 
 ## Holdout scenarios
 
@@ -209,7 +198,7 @@ Gate-1 fault metrics are a regression guard on deterministic code, not a headlin
 | forbidden_tool_inserted | gate1_fault | 5 | 100% [57%, 100%] (n=5) | 100% [57%, 100%] (n=5) |
 | incorrect_final_answer | gate2_fault | 15 | 100% [80%, 100%] (n=15) | 100% [80%, 100%] (n=15) |
 | missing_required_arg | gate1_fault | 5 | 100% [57%, 100%] (n=5) | 100% [57%, 100%] (n=5) |
-| rubric_item_ignored | gate2_fault | 15 | 33% [15%, 58%] (n=15) | 100% [57%, 100%] (n=5) |
+| rubric_item_ignored | gate2_fault | 15 | 47% [25%, 70%] (n=15) | 100% [65%, 100%] (n=7) |
 | skill_not_triggered | gate1_fault | 5 | 100% [57%, 100%] (n=5) | 100% [57%, 100%] (n=5) |
 | skipped_step | gate1_fault | 5 | 100% [57%, 100%] (n=5) | 100% [57%, 100%] (n=5) |
 | swapped_order | gate1_fault | 3 | 100% [44%, 100%] (n=3) | 100% [44%, 100%] (n=3) |
@@ -248,7 +237,7 @@ Does the FULL pipeline (gate 1 + gate 2 combined) incorrectly fail something tha
 
 #### Gate-2 misses (detail)
 
-22 gate-2 miss(es) in this split (fault operators the pipeline failed to catch). Scenario-level detail is withheld in this aggregate-only section - see the per-operator detection-rate table above.
+20 gate-2 miss(es) in this split (fault operators the pipeline failed to catch). Scenario-level detail is withheld in this aggregate-only section - see the per-operator detection-rate table above.
 
 #### hallucinated_action (separate table — see plan caveat)
 
@@ -272,8 +261,8 @@ Reported separately: gate 1 never sees this fault by construction (the removed t
 
 #### Gate-1 contribution
 
-- Total detections: 86
-- Caught by gate 1 alone: 48 (56%)
+- Total detections: 88
+- Caught by gate 1 alone: 48 (55%)
 - LLM calls avoided by gate-1 short-circuit: 48
 
 #### Judge flip rate (k repeats)
@@ -284,5 +273,51 @@ Reported separately: gate 1 never sees this fault by construction (the removed t
 #### Judge cost / latency
 
 - Judged items (excluding cache hits): 108
-- Mean cost per judged item: $0.000333
-- Mean latency per judged item: 3262 ms
+- Mean cost per judged item: $0.000330
+- Mean latency per judged item: 2685 ms
+
+## Baseline v1 vs v2
+
+Effect of the PR #20 scenario fixes (see `benchmarks/BASELINE.md`, "Post-freeze changes"). v1 = `benchmarks/baseline_v1_results.json` (freeze `a3cc791`), v2 = this run. Detection rate for fault operators, pipeline false-positive rate for benign operators; JUDGE_ERROR outcomes excluded as elsewhere in this report. Both runs used the same judge config, seed 0, k=3, refreshed cache, so judge nondeterminism at temperature 0 is the only other source of change.
+
+### Dev
+
+| Operator | Category | Metric | v1 | v2 | Δ |
+|---|---|---|---|---|---|
+| hallucinated_action | gate2_fault | Detection | 27% (n=33) | 30% (n=33) | +3 pp |
+| incorrect_final_answer | gate2_fault | Detection | 98% (n=45) | 100% (n=45) | +2 pp |
+| rubric_item_ignored | gate2_fault | Detection | 24% (n=45) | 40% (n=45) | +16 pp |
+| unsafe_content_in_output | gate2_fault | Detection | 100% (n=45) | 100% (n=45) | 0 |
+| clean_base | benign | FP | 11% (n=45) | 7% (n=45) | -4 pp |
+| extra_args_under_subset | benign | FP | 12% (n=33) | 9% (n=33) | -3 pp |
+| paraphrased_but_correct_final_answer | benign | FP | 7% (n=45) | 9% (n=45) | +2 pp |
+| regex_conforming_variable_value | benign | FP | 25% (n=12) | 25% (n=12) | 0 |
+| reorder_under_any_order | benign | FP | 0% (n=12) | 0% (n=12) | 0 |
+
+Gate-1 fault operators with identical rates in both runs (omitted): cost_blowout, cost_incomplete, duplicated_step, forbidden_args_injected, forbidden_tool_inserted, missing_required_arg, skill_not_triggered, skipped_step, swapped_order, type_changed_arg, wrong_arg_value, wrong_tool_substituted.
+
+Dev pipeline FPs by scenario: v1 had 15 (`search_001_in_order_regex` 12, `file_ops_002_any_order_regex` 2, `scheduling_003_any_order_any` 1);
+v2 has 13 (`search_001_in_order_regex` 12, `file_ops_001_in_order_subset` 1). The `file_ops_002` fix removed its
+FPs. The `search_001` fix did **not**: every clean/benign item still fails, but the judge's reasoning no longer cites
+the `example.com` domain. It now faults the answer for covering one release/source when the prompt asks for the
+latest 2026 SDK releases (plural), and for a thin summary with no version context. That is a remaining scenario
+issue to review, not a resolved one. `rubric_item_ignored` detection rose 24% → 40% (n=45), in line with the two
+variant fixes; the overlapping CIs mean part of that shift may be judge variance.
+
+### Holdout (aggregate only)
+
+No holdout scenario was edited in PR #20; differences here come from the regex operator change or judge variance.
+
+| Operator | Category | Metric | v1 | v2 | Δ |
+|---|---|---|---|---|---|
+| hallucinated_action | gate2_fault | Detection | 20% (n=15) | 20% (n=15) | 0 |
+| incorrect_final_answer | gate2_fault | Detection | 100% (n=15) | 100% (n=15) | 0 |
+| rubric_item_ignored | gate2_fault | Detection | 33% (n=15) | 47% (n=15) | +13 pp |
+| unsafe_content_in_output | gate2_fault | Detection | 100% (n=15) | 100% (n=15) | 0 |
+| clean_base | benign | FP | 20% (n=15) | 20% (n=15) | 0 |
+| extra_args_under_subset | benign | FP | 33% (n=9) | 33% (n=9) | 0 |
+| paraphrased_but_correct_final_answer | benign | FP | 20% (n=15) | 20% (n=15) | 0 |
+| regex_conforming_variable_value | benign | FP | 100% (n=3) | 100% (n=3) | 0 |
+| reorder_under_any_order | benign | FP | 0% (n=6) | 0% (n=6) | 0 |
+
+Gate-1 fault operators with identical rates in both runs (omitted): cost_blowout, cost_incomplete, forbidden_args_injected, forbidden_tool_inserted, missing_required_arg, skill_not_triggered, skipped_step, swapped_order, type_changed_arg, wrong_arg_value, wrong_tool_substituted.
