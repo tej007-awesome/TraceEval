@@ -18,6 +18,8 @@ from traceeval.core.schema import AgentTrace, EDDTestCase, ToolCall
 _PASSING_SCORE_JSON = json.dumps({
     "intent_satisfaction": 1.0, "functional_correctness": 1.0, "trajectory_quality": 1.0,
     "cost_efficiency": 1.0, "safety_and_rai": 1.0, "reasoning": "looks good",
+    "rubric_items": [{"index": 0, "verdict": "pass", "evidence": "ok"}],
+    "claimed_actions": [],
 })
 
 

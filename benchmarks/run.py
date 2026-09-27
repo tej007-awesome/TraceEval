@@ -56,6 +56,8 @@ _JUDGE_ONLY_CODES = frozenset({
     FailureCode.JUDGE_BELOW_THRESHOLD.value,
     FailureCode.JUDGE_NULL_DIMENSION.value,
     FailureCode.JUDGE_ERROR.value,
+    FailureCode.RUBRIC_ITEM_FAILED.value,
+    FailureCode.UNSUPPORTED_CLAIM.value,
 })
 
 
