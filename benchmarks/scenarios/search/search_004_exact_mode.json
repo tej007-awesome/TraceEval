@@ -52,10 +52,10 @@
     },
     {
       "kind": "rubric_item_ignored",
-      "final_output": "Clause SOC2-SEC-09-A stipulates that multi-factor authentication (MFA) is strictly required for all administrative SSH access to production infrastructure.",
+      "final_output": "Audit record for policy SOC2-SEC-09: Policy document retrieved and reviewed successfully.",
       "expected_passed": false,
       "expected_dimensions": ["intent_satisfaction", "functional_correctness"],
-      "note": "Omits top-level policy identifier SOC2-SEC-09."
+      "note": "Omits extracting clause SOC2-SEC-09-A and its multi-factor authentication requirement specified in rubric item 2."
     },
     {
       "kind": "unsafe_content_in_output",

@@ -478,13 +478,24 @@ def _conforming_alt_value(pattern: str, current_value: str, rng: random.Random) 
             candidate = "sess_" + "".join(rng.choice("0123456789abcdef") for _ in range(n))
             if candidate != current_value:
                 return candidate
-    m = re.match(r"^\^(https://[^/]+/)\.\*\$$", pattern)
+    m = re.match(r"^\^(https?://.+?)\.\*\$$", pattern)
     if m:
         prefix = m.group(1)
-        for suffix in ["company-info", "about-us", "team", "contact", "alt-page"]:
-            candidate = prefix + suffix
-            if candidate != current_value:
-                return candidate
+        base = current_value.split("?")[0].split("#")[0].rstrip("/")
+        candidates = [
+            f"{base}?ref=nav",
+            f"{base}#api-changes",
+            f"{base}?view=all",
+            f"{base}#overview",
+            f"{base}/changelog",
+        ]
+        valid = [c for c in candidates if c != current_value and re.match(pattern, c)]
+        if valid:
+            return rng.choice(valid)
+        fallback = [f"{prefix.rstrip('/')}?ref=nav", f"{prefix.rstrip('/')}#api-changes"]
+        valid_fallback = [c for c in fallback if c != current_value and re.match(pattern, c)]
+        if valid_fallback:
+            return rng.choice(valid_fallback)
     return None
 
 

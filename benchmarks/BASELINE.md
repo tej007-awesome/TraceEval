@@ -25,7 +25,7 @@ f33c43672c0bcf1392f8c65d3b30b011726f375c4071f9ff38ad808f3b229a87  benchmarks/sce
 99dd546dca16408104cbe1bcb70dcb0420507ca65f07babdef760b730c400dfd  benchmarks/scenarios/code_tools/code_tools_003_any_order_subset.json
 5409cb168f1cb155164d8bde28d959c4af3b0ef21c905b23acda079c4be67ed0  benchmarks/scenarios/code_tools/code_tools_004_exact_mode.json
 9ec3697210d796592fda1d2aa1095f9966215c7d5506481883d4c6f4925a63c8  benchmarks/scenarios/file_ops/file_ops_001_in_order_subset.json
-dd4927f26dee2d30ed8b87ab31d8743e248abad1fc964177370073ae481a36dc  benchmarks/scenarios/file_ops/file_ops_002_any_order_regex.json
+d0fcba414908341dd743996288efec8833a548a4fee8d80a650ba61b8ef930cd  benchmarks/scenarios/file_ops/file_ops_002_any_order_regex.json
 7be0a2fa13518508ff02756a82ca4ed3ae8aea2ff9c3641b9ff9c94caf83dfc5  benchmarks/scenarios/file_ops/file_ops_003_any_order_subset.json
 30d3c34ba0dab13abdfdc09bdd8dd102e6ec5f771caafadce275519fdfaf6012  benchmarks/scenarios/file_ops/file_ops_004_in_order_any.json
 27e2a686db16dd942cd22852648de10ac45fff082ad82c100e68c8be39baa45c  benchmarks/scenarios/refunds/refund_001_in_order_subset_regex.json
@@ -36,10 +36,10 @@ f53933c2dea73ee2dea8bde14621e07e2092f051d2bd32274becd11c6fe382d8  benchmarks/sce
 2b47d6e5f05a2184d692011a8acf1189b388ff5ee238c0e9b0219344ac2fdc7d  benchmarks/scenarios/scheduling/scheduling_002_any_order_subset.json
 fb872face6507863613602a39159c559ab3edfbe123ff61466a13a5e368b24bd  benchmarks/scenarios/scheduling/scheduling_003_any_order_any.json
 0ef452f17c2d1e9cdabd2071013330ce655ece1aea4ae89d774d21d71643f67a  benchmarks/scenarios/scheduling/scheduling_004_exact_mode.json
-a28014c0f128d0514a552c9087c76b88039db1ca0541c3f4b964bdc51b9c2f6c  benchmarks/scenarios/search/search_001_in_order_regex.json
-c2966ff10125c9b356960c76381f82855baaf5ed014fd93047462af0ec9c54b1  benchmarks/scenarios/search/search_002_any_order_subset.json
+06dceaf92f3fd40d7aa0efafab7fcd8ff57da8cb67899cfb0635c8f93bc7a653  benchmarks/scenarios/search/search_001_in_order_regex.json
+420ff13947764248bff8cc08093340e8615b876396681bdae3dc564559caf273  benchmarks/scenarios/search/search_002_any_order_subset.json
 a621dc7c10db8699eddd38578dd7b721992c6c2f6d5eac7afe12e6ffe13373fd  benchmarks/scenarios/search/search_003_any_order_multi.json
-45b4aa898c594aeb34c4dd4cd3286048c7e5390d85ef4a3bfbd87c94bebcfa62  benchmarks/scenarios/search/search_004_exact_mode.json
+3a24b5809530e46448f38963825d892ae217f8cc9c7d2f9b6a36444e0fe9d240  benchmarks/scenarios/search/search_004_exact_mode.json
 ```
 
 Regenerate with: `find benchmarks/scenarios -name "*.json" | sort | xargs shasum -a 256`
@@ -70,5 +70,16 @@ domain):
 
 ## Post-freeze changes
 
-_(none yet - add an entry here, with commit SHA and reason, the first time any file under
-`benchmarks/scenarios/` changes after this freeze point)_
+### PR "fix: scenario bugs found in baseline human review (#7)"
+
+- **`benchmarks/scenarios/file_ops/file_ops_002_any_order_regex.json`**:
+  - **Reason**: Clean trace called `write_environment_var` instead of updating `/etc/config/app.json` as requested in the prompt, and contained the typo "environment environment configuration" in `final_output`. Fixed by consistently using `write_config_value` with the filepath in `expected_tool_calls`, `forbidden_args`, and `executed_tools`, and corrected `final_output` to confirm updating `/etc/config/app.json`.
+
+- **`benchmarks/scenarios/search/search_001_in_order_regex.json`**:
+  - **Reason**: The judge penalized `docs.example.com` for not being an authoritative source, failing clean and benign items. Replaced the fictional domain with the plausible vendor docs domain `https://docs.agentsdk.dev` across `expected_tool_calls` regex, `executed_tools`, `final_output`, and all gate-2 variants.
+
+- **`benchmarks/scenarios/search/search_002_any_order_subset.json`**:
+  - **Reason**: The `rubric_item_ignored` variant retained both prices ($0.04/hr vs $0.035/hr), conveying that Cloud-B was cheaper implicitly and failing to remove the underlying comparative information required by rubric item 2. Fixed variant to report only Cloud-A pricing so the comparison is not derivable.
+
+- **`benchmarks/scenarios/search/search_004_exact_mode.json`**:
+  - **Reason**: The `rubric_item_ignored` variant attempted to omit policy document `SOC2-SEC-09` by citing clause `SOC2-SEC-09-A`, but because the clause code contains the policy code as a substring, the information was not actually removed. Updated variant to target omission of clause extraction (rubric item 2) so the required information is completely removed.

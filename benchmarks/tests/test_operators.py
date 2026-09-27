@@ -149,6 +149,42 @@ def test_regex_conforming_variable_value_notes_when_final_output_unaffected(in_o
     assert "unchanged (old value not present)" in result.label
 
 
+def test_conforming_alt_value_url_stays_plausible():
+    from benchmarks.operators import _conforming_alt_value
+
+    rng = random.Random(42)
+    pattern = r"^https://docs.agentsdk.dev/.*$"
+    current = "https://docs.agentsdk.dev/sdk-v3"
+    alt = _conforming_alt_value(pattern, current, rng)
+
+    assert alt is not None
+    assert alt != current
+    assert alt.startswith("https://docs.agentsdk.dev/sdk-v3")
+    assert not any(bad in alt for bad in ["company-info", "about-us", "team", "contact", "alt-page"])
+    assert any(variant in alt for variant in ["?ref=nav", "#api-changes", "?view=all", "#overview", "/changelog"])
+
+
+def test_regex_conforming_variable_value_url_preserves_consistency():
+    import json
+
+    from benchmarks.models import Scenario
+    from benchmarks.tests.conftest import SCENARIOS_DIR
+
+    path = SCENARIOS_DIR / "search" / "search_001_in_order_regex.json"
+    scenario = Scenario.model_validate(json.loads(path.read_text(encoding="utf-8")))
+    func = dict(ALL_OPERATORS)["regex_conforming_variable_value"]
+    rng = random.Random(0)
+    result = func(scenario, rng)
+
+    assert result.applicable is True
+    old_url = "https://docs.agentsdk.dev/sdk-v3"
+    new_url = result.mutated_trace.executed_tools[2].args["url"]
+    assert new_url != old_url
+    assert new_url in result.mutated_trace.final_output
+    assert old_url not in result.mutated_trace.final_output.replace(new_url, "")
+    assert not any(bad in new_url for bad in ["company-info", "about-us", "team", "contact", "alt-page"])
+
+
 # --- reorder_under_any_order: independent_call_groups ---
 
 
