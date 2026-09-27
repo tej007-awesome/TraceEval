@@ -10,6 +10,8 @@ import math
 from collections import defaultdict
 from typing import Dict, List, NamedTuple
 
+from traceeval.core.schema import FailureCode
+
 from benchmarks.models import EvalOutcome
 
 
@@ -41,6 +43,15 @@ class OperatorMetric(NamedTuple):
     false_positive_rate: WilsonInterval  # benign operators: incorrectly failed (actual_passed=False when expected True)
 
 
+class Gate2CodeAttribution(NamedTuple):
+    operator: str
+    category: str
+    n_detections: int
+    rubric_item_failed: int
+    unsupported_claim: int
+    judge_below_threshold: int
+
+
 def _is_detection(o: EvalOutcome) -> bool:
     return o.actual_passed is False and o.expected_passed is False
 
@@ -48,12 +59,23 @@ def _is_detection(o: EvalOutcome) -> bool:
 def _is_correct_attribution(o: EvalOutcome) -> bool:
     if not _is_detection(o):
         return False
+    if o.category == "gate2_fault":
+        if o.expected_code is not None:
+            code_val = o.expected_code.value if hasattr(o.expected_code, "value") else str(o.expected_code)
+            if code_val in o.actual_codes:
+                if o.expected_dimensions:
+                    return any(d in o.actual_below_threshold_dimensions for d in o.expected_dimensions)
+                return True
+        if FailureCode.RUBRIC_ITEM_FAILED.value in o.actual_codes:
+            return True
+        if FailureCode.UNSUPPORTED_CLAIM.value in o.actual_codes:
+            return True
+        if o.expected_dimensions:
+            return any(d in o.actual_below_threshold_dimensions for d in o.expected_dimensions)
+        return False
     if o.expected_code is not None:
         return o.expected_code.value in o.actual_codes if hasattr(o.expected_code, "value") else o.expected_code in o.actual_codes
     if o.expected_dimensions:
-        # Correct if the judge's JUDGE_BELOW_THRESHOLD result named ANY of the expected
-        # dimensions - not just any dimension it happened to mention (e.g. JUDGE_NULL_
-        # DIMENSION is a different failure mode and doesn't count toward attribution).
         return any(d in o.actual_below_threshold_dimensions for d in o.expected_dimensions)
     return True
 
@@ -224,3 +246,29 @@ def mean_cost_and_latency(outcomes: List[EvalOutcome]) -> Dict[str, float]:
         "mean_cost_usd": sum(o.cost_usd for o in judged) / len(judged),
         "mean_latency_ms": sum(o.latency_ms for o in judged) / len(judged),
     }
+
+
+def compute_gate2_code_attributions(outcomes: List[EvalOutcome]) -> List[Gate2CodeAttribution]:
+    """Breakdown of gate-2 detections by failure code (which mechanism caught each fault).
+    Excludes JUDGE_ERROR outcomes. Items may trigger more than one mechanism."""
+    by_operator: Dict[str, List[EvalOutcome]] = defaultdict(list)
+    for o in outcomes:
+        if o.category == "gate2_fault" and not o.is_judge_error:
+            by_operator[o.operator].append(o)
+
+    rows = []
+    for operator, items in sorted(by_operator.items()):
+        category = items[0].category
+        detections = [o for o in items if _is_detection(o)]
+        n_rubric = sum(1 for o in detections if FailureCode.RUBRIC_ITEM_FAILED.value in o.actual_codes)
+        n_claim = sum(1 for o in detections if FailureCode.UNSUPPORTED_CLAIM.value in o.actual_codes)
+        n_threshold = sum(1 for o in detections if FailureCode.JUDGE_BELOW_THRESHOLD.value in o.actual_codes)
+        rows.append(Gate2CodeAttribution(
+            operator=operator,
+            category=category,
+            n_detections=len(detections),
+            rubric_item_failed=n_rubric,
+            unsupported_claim=n_claim,
+            judge_below_threshold=n_threshold,
+        ))
+    return rows

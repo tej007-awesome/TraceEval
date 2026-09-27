@@ -13,6 +13,7 @@ from typing import List
 from benchmarks.holdout import load_holdout
 from benchmarks.metrics import (
     compute_gate1_fp_metrics,
+    compute_gate2_code_attributions,
     compute_operator_metrics,
     flip_rate_by_scenario_operator,
     gate1_share_of_detections,
@@ -186,6 +187,24 @@ def _build_section(outcomes: List[EvalOutcome], config: dict, aggregate_only: bo
         lines.append("")
         for m in compute_operator_metrics(hallucinated):
             lines.append(f"- n={m.n}, detection rate: {_fmt_wilson(m.detection_rate)}, attribution: {_fmt_wilson(m.code_attribution_rate)}")
+        lines.append("")
+
+    gate2_attribs = compute_gate2_code_attributions(outcomes)
+    if gate2_attribs:
+        lines.append("#### Gate-2 detection mechanism attribution")
+        lines.append("")
+        lines.append(
+            "Attribution of gate-2 fault detections by code: which mechanism caught each fault "
+            "(an item can be caught by more than one mechanism). JUDGE_ERROR outcomes are excluded."
+        )
+        lines.append("")
+        lines.append("| Operator | Detections | RUBRIC_ITEM_FAILED | UNSUPPORTED_CLAIM | JUDGE_BELOW_THRESHOLD |")
+        lines.append("|---|---|---|---|---|")
+        for a in gate2_attribs:
+            lines.append(
+                f"| {a.operator} | {a.n_detections} | {a.rubric_item_failed} | "
+                f"{a.unsupported_claim} | {a.judge_below_threshold} |"
+            )
         lines.append("")
 
     judge_error_rates = judge_error_rate_by_operator(outcomes)

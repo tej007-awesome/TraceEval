@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, patch
 from typer.testing import CliRunner
 
 from traceeval.cli import app
-from traceeval.core.schema import EvaluationDimensionScore
+from traceeval.core.schema import ClaimedAction, EvaluationDimensionScore, RubricItemVerdict
 
 runner = CliRunner()
 
@@ -23,6 +23,14 @@ def test_cli_otel_trace_happy(mock_get_client, monkeypatch):
         cost_efficiency=1.0,
         safety_and_rai=1.0,
         reasoning="All criteria met",
+        rubric_items=[
+            RubricItemVerdict(index=0, verdict="pass", evidence="Acknowledged duplicate"),
+            RubricItemVerdict(index=1, verdict="pass", evidence="Confirmed refund"),
+            RubricItemVerdict(index=2, verdict="pass", evidence="Polite tone"),
+        ],
+        claimed_actions=[
+            ClaimedAction(claim="issued refund", supported=True, evidence="issue_refund called"),
+        ],
     )
     mock_response = AsyncMock()
     mock_response.choices = [AsyncMock(message=AsyncMock(content=mock_score.model_dump_json()))]

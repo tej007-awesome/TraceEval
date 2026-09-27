@@ -1,7 +1,7 @@
 from __future__ import annotations
 import re
 from pydantic import BaseModel, Field, field_validator, model_validator
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Literal
 from enum import Enum
 
 class TrajectoryMode(str, Enum):
@@ -33,6 +33,8 @@ class FailureCode(str, Enum):
     JUDGE_BELOW_THRESHOLD = "JUDGE_BELOW_THRESHOLD"
     JUDGE_NULL_DIMENSION = "JUDGE_NULL_DIMENSION"
     JUDGE_ERROR = "JUDGE_ERROR"
+    RUBRIC_ITEM_FAILED = "RUBRIC_ITEM_FAILED"
+    UNSUPPORTED_CLAIM = "UNSUPPORTED_CLAIM"
 
 class FailureReason(BaseModel):
     """Structured detail for a single failure, carried alongside the plain-text reason string."""
@@ -44,6 +46,9 @@ class FailureReason(BaseModel):
     expected: Optional[Any] = None
     actual: Optional[Any] = None
     dimension: Optional[str] = Field(None, description="Snake_case EvaluationDimensionScore field name, for gate-2 (judge) failures.")
+    rubric_index: Optional[int] = Field(None, description="Index of the failed rubric item (for RUBRIC_ITEM_FAILED).")
+    claim: Optional[str] = Field(None, description="Claim text asserted in final output (for UNSUPPORTED_CLAIM).")
+    evidence: Optional[str] = Field(None, description="Judge evidence or justification (for RUBRIC_ITEM_FAILED and UNSUPPORTED_CLAIM).")
 
 class CheckResult(BaseModel):
     """Outcome of a single deterministic gate, with human-readable reasons on failure."""
@@ -174,6 +179,38 @@ class AgentTrace(BaseModel):
     total_token_cost_usd: float = Field(ge=0.0)
     cost_complete: bool = True
 
+class RubricItemVerdict(BaseModel):
+    """Judge verdict for a single rubric item."""
+    index: int
+    verdict: Literal["pass", "fail"]
+    evidence: str
+
+    @field_validator("verdict", mode="before")
+    @classmethod
+    def _normalize_verdict(cls, v: Any) -> str:
+        if isinstance(v, str):
+            v_lower = v.strip().lower()
+            if v_lower in ("pass", "fail"):
+                return v_lower
+        return v
+
+class ClaimedAction(BaseModel):
+    """An action the final output claims was performed, evaluated against the executed tool trajectory."""
+    claim: str
+    supported: bool
+    evidence: str
+
+    @field_validator("supported", mode="before")
+    @classmethod
+    def _normalize_supported(cls, v: Any) -> bool:
+        if isinstance(v, str):
+            v_lower = v.strip().lower()
+            if v_lower in ("true", "yes", "supported", "1"):
+                return True
+            if v_lower in ("false", "no", "unsupported", "0"):
+                return False
+        return v
+
 class EvaluationDimensionScore(BaseModel):
     """Scores mapped directly to the 5 dimensions of Vibe Coding Evaluation."""
     intent_satisfaction: Optional[float] = Field(None, ge=0.0, le=1.0)
@@ -182,6 +219,21 @@ class EvaluationDimensionScore(BaseModel):
     cost_efficiency: Optional[float] = Field(None, ge=0.0, le=1.0)
     safety_and_rai: Optional[float] = Field(None, ge=0.0, le=1.0)
     reasoning: str = Field(..., description="The judge's justification for the scores.")
+    rubric_items: Optional[List[RubricItemVerdict]] = Field(
+        None, description="Per-rubric-item verdicts (index, verdict: pass|fail, evidence)."
+    )
+    claimed_actions: Optional[List[ClaimedAction]] = Field(
+        None, description="List of actions claimed in final output and whether supported by executed tools."
+    )
+
+    @field_validator("reasoning", mode="before")
+    @classmethod
+    def _coerce_reasoning(cls, v: Any) -> Any:
+        if isinstance(v, dict):
+            return "\n".join(f"{k}: {v[k]}" for k in sorted(v.keys()))
+        if isinstance(v, list):
+            return "\n".join(str(x) for x in v)
+        return v
 
 class EvaluationResult(BaseModel):
     """The final output payload for TraceEval."""

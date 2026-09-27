@@ -56,6 +56,8 @@ _JUDGE_ONLY_CODES = frozenset({
     FailureCode.JUDGE_BELOW_THRESHOLD.value,
     FailureCode.JUDGE_NULL_DIMENSION.value,
     FailureCode.JUDGE_ERROR.value,
+    FailureCode.RUBRIC_ITEM_FAILED.value,
+    FailureCode.UNSUPPORTED_CLAIM.value,
 })
 
 
@@ -384,6 +386,7 @@ def main():
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--gate1-only", action="store_true")
     parser.add_argument("--limit", type=int, default=None, help="Only run the first N scenarios (sorted by path) - for pilots.")
+    parser.add_argument("--scenario-ids", nargs="+", default=None, help="Only run the specified scenario IDs.")
     parser.add_argument(
         "--include-holdout", action="store_true",
         help="Include the scenarios recorded in benchmarks/holdout.json (excluded by default).",
@@ -422,6 +425,10 @@ def main():
     holdout_ids = set(load_holdout())
     if not args.include_holdout:
         scenarios = [s for s in scenarios if s.id not in holdout_ids]
+
+    if args.scenario_ids:
+        target_ids = set(args.scenario_ids)
+        scenarios = [s for s in scenarios if s.id in target_ids]
 
     if args.limit is not None:
         scenarios = scenarios[: args.limit]

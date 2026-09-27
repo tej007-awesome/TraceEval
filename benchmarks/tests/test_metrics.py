@@ -1,6 +1,7 @@
 from benchmarks.metrics import (
     _is_correct_attribution,
     compute_gate1_fp_metrics,
+    compute_gate2_code_attributions,
     compute_operator_metrics,
     gate1_share_of_detections,
     is_gate1_false_positive,
@@ -237,3 +238,66 @@ def test_list_gate2_misses_only_includes_missed_faults():
     records = list_gate2_misses([missed, caught, benign_pass])
     assert len(records) == 1
     assert records[0]["operator"] == "incorrect_final_answer"
+
+
+def test_attribution_gate2_rubric_item_failed():
+    o = EvalOutcome(
+        scenario_id="s", domain="refunds", operator="rubric_item_ignored", category="gate2_fault",
+        expected_passed=False, expected_gate="gate2", expected_dimensions=["intent_satisfaction"],
+        actual_passed=False, actual_codes=["RUBRIC_ITEM_FAILED"],
+    )
+    assert _is_correct_attribution(o) is True
+
+
+def test_attribution_gate2_unsupported_claim():
+    o = EvalOutcome(
+        scenario_id="s", domain="refunds", operator="hallucinated_action", category="gate2_fault",
+        expected_passed=False, expected_gate="gate2", expected_dimensions=["functional_correctness"],
+        actual_passed=False, actual_codes=["UNSUPPORTED_CLAIM"],
+    )
+    assert _is_correct_attribution(o) is True
+
+
+def test_compute_gate2_code_attributions():
+    outcomes = [
+        EvalOutcome(
+            scenario_id="s1", domain="d", operator="rubric_item_ignored", category="gate2_fault",
+            expected_passed=False, actual_passed=False, actual_codes=["RUBRIC_ITEM_FAILED"],
+        ),
+        EvalOutcome(
+            scenario_id="s2", domain="d", operator="rubric_item_ignored", category="gate2_fault",
+            expected_passed=False, actual_passed=False,
+            actual_codes=["RUBRIC_ITEM_FAILED", "JUDGE_BELOW_THRESHOLD"],
+            actual_below_threshold_dimensions=["intent_satisfaction"],
+        ),
+        EvalOutcome(
+            scenario_id="s3", domain="d", operator="rubric_item_ignored", category="gate2_fault",
+            expected_passed=False, actual_passed=False,
+            actual_codes=["JUDGE_BELOW_THRESHOLD"],
+            actual_below_threshold_dimensions=["intent_satisfaction"],
+        ),
+        EvalOutcome(
+            scenario_id="s4", domain="d", operator="hallucinated_action", category="gate2_fault",
+            expected_passed=False, actual_passed=False, actual_codes=["UNSUPPORTED_CLAIM"],
+        ),
+        EvalOutcome(
+            scenario_id="s5", domain="d", operator="rubric_item_ignored", category="gate2_fault",
+            expected_passed=False, actual_passed=False, is_judge_error=True,
+            actual_codes=["JUDGE_ERROR"],
+        ),
+    ]
+    rows = compute_gate2_code_attributions(outcomes)
+    assert len(rows) == 2
+    by_op = {r.operator: r for r in rows}
+
+    rubric_row = by_op["rubric_item_ignored"]
+    assert rubric_row.n_detections == 3  # judge_error excluded
+    assert rubric_row.rubric_item_failed == 2
+    assert rubric_row.judge_below_threshold == 2
+    assert rubric_row.unsupported_claim == 0
+
+    hallucinated_row = by_op["hallucinated_action"]
+    assert hallucinated_row.n_detections == 1
+    assert hallucinated_row.unsupported_claim == 1
+    assert hallucinated_row.rubric_item_failed == 0
+    assert hallucinated_row.judge_below_threshold == 0

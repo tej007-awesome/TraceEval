@@ -14,6 +14,8 @@ from traceeval.core.schema import (
     EDDTestCase,
     AgentTrace,
     EvaluationDimensionScore,
+    RubricItemVerdict,
+    ClaimedAction,
 )
 from traceeval.metrics.trajectory_judge import (
     validate_trajectory,
@@ -278,7 +280,11 @@ async def test_evaluate_dimensions(mock_get_judge_client):
         trajectory_quality=1.0,
         cost_efficiency=0.8,
         safety_and_rai=1.0,
-        reasoning="Good implementation"
+        reasoning="Good implementation",
+        rubric_items=[
+            RubricItemVerdict(index=0, verdict="pass", evidence="Output satisfied check 1")
+        ],
+        claimed_actions=[],
     )
     mock_message.content = mock_score.model_dump_json()
     mock_choice.message = mock_message
@@ -579,6 +585,168 @@ async def test_run_evaluation_judge_error_cases(mock_eval_dimensions):
         assert d.code == FailureCode.JUDGE_ERROR
         assert message in d.message
         assert any(message in f for f in res.failures)
+
+
+@pytest.mark.asyncio
+@patch("traceeval.metrics.trajectory_judge.get_judge_client")
+async def test_evaluate_dimensions_missing_fields_raises(mock_get_judge_client):
+    mock_client = MagicMock()
+    mock_get_judge_client.return_value = mock_client
+
+    case = EDDTestCase(
+        case_id="c_missing", input_prompt="p",
+        expected_tool_calls=[], trajectory_mode=TrajectoryMode.IN_ORDER,
+        rubric=["r1"],
+    )
+    trace = AgentTrace(
+        session_id="s_missing", triggered_skills=[], executed_tools=[],
+        final_output="out", total_token_cost_usd=0.01,
+    )
+
+    # Missing rubric_items
+    mock_response = MagicMock()
+    mock_choice = MagicMock()
+    mock_choice.message.content = '{"intent_satisfaction": 0.9, "functional_correctness": 0.9, "trajectory_quality": 0.9, "cost_efficiency": 0.9, "safety_and_rai": 0.9, "reasoning": "ok", "claimed_actions": []}'
+    mock_response.choices = [mock_choice]
+    mock_client.chat.completions.create = AsyncMock(return_value=mock_response)
+    with pytest.raises(ValueError, match="Judge response missing required field.*rubric_items"):
+        await evaluate_dimensions(trace, case)
+
+    # Missing claimed_actions
+    mock_choice.message.content = '{"intent_satisfaction": 0.9, "functional_correctness": 0.9, "trajectory_quality": 0.9, "cost_efficiency": 0.9, "safety_and_rai": 0.9, "reasoning": "ok", "rubric_items": [{"index": 0, "verdict": "pass", "evidence": "good"}]}'
+    with pytest.raises(ValueError, match="Judge response missing required field.*claimed_actions"):
+        await evaluate_dimensions(trace, case)
+
+
+@pytest.mark.asyncio
+@patch("traceeval.metrics.trajectory_judge.get_judge_client")
+async def test_run_evaluation_missing_fields_converted_to_judge_error(mock_get_judge_client):
+    mock_client = MagicMock()
+    mock_get_judge_client.return_value = mock_client
+
+    case = EDDTestCase(
+        case_id="c_missing", input_prompt="p",
+        expected_tool_calls=[], trajectory_mode=TrajectoryMode.IN_ORDER,
+        rubric=["r1"],
+    )
+    trace = AgentTrace(
+        session_id="s_missing", triggered_skills=[], executed_tools=[],
+        final_output="out", total_token_cost_usd=0.01,
+    )
+
+    mock_response = MagicMock()
+    mock_choice = MagicMock()
+    # Missing both rubric_items and claimed_actions
+    mock_choice.message.content = '{"intent_satisfaction": 0.9, "functional_correctness": 0.9, "trajectory_quality": 0.9, "cost_efficiency": 0.9, "safety_and_rai": 0.9, "reasoning": "ok"}'
+    mock_response.choices = [mock_choice]
+    mock_client.chat.completions.create = AsyncMock(return_value=mock_response)
+
+    res = await run_evaluation(case, trace)
+    assert res.passed is False
+    assert any(fd.code == FailureCode.JUDGE_ERROR for fd in res.failure_details)
+    assert any("rubric_items" in fd.message for fd in res.failure_details)
+
+
+@pytest.mark.asyncio
+@patch("traceeval.metrics.trajectory_judge.evaluate_dimensions")
+async def test_run_evaluation_rubric_item_failed(mock_eval_dimensions):
+    case = EDDTestCase(
+        case_id="case_rubric", input_prompt="Prompt", expected_tool_calls=[],
+        trajectory_mode=TrajectoryMode.IN_ORDER, rubric=["identify cheaper option", "cite sources"],
+    )
+    trace = AgentTrace(
+        session_id="s1", triggered_skills=[], executed_tools=[],
+        final_output="Output", total_token_cost_usd=0.01,
+    )
+    mock_eval_dimensions.return_value = EvaluationDimensionScore(
+        intent_satisfaction=0.9,
+        functional_correctness=0.9,
+        trajectory_quality=1.0,
+        cost_efficiency=0.8,
+        safety_and_rai=1.0,
+        reasoning="Good overall but missed rubric item 0",
+        rubric_items=[
+            RubricItemVerdict(index=0, verdict="fail", evidence="Did not identify cheaper option"),
+            RubricItemVerdict(index=1, verdict="pass", evidence="Cited vendor docs"),
+        ],
+        claimed_actions=[],
+    )
+    res = await run_evaluation(case, trace)
+    assert res.passed is False
+    assert any("rubric item 0 failed" in f for f in res.failures)
+    rubric_failures = [fd for fd in res.failure_details if fd.code == FailureCode.RUBRIC_ITEM_FAILED]
+    assert len(rubric_failures) == 1
+    rf = rubric_failures[0]
+    assert rf.rubric_index == 0
+    assert rf.expected_index == 0
+    assert rf.evidence == "Did not identify cheaper option"
+    assert "rubric item 0 failed: Did not identify cheaper option" in rf.message
+
+
+@pytest.mark.asyncio
+@patch("traceeval.metrics.trajectory_judge.evaluate_dimensions")
+async def test_run_evaluation_unsupported_claim(mock_eval_dimensions):
+    case = EDDTestCase(
+        case_id="case_claim", input_prompt="Prompt", expected_tool_calls=[],
+        trajectory_mode=TrajectoryMode.IN_ORDER, rubric=["rubric 1"],
+    )
+    trace = AgentTrace(
+        session_id="s1", triggered_skills=[], executed_tools=[],
+        final_output="I updated the configuration file.", total_token_cost_usd=0.01,
+    )
+    mock_eval_dimensions.return_value = EvaluationDimensionScore(
+        intent_satisfaction=0.9,
+        functional_correctness=0.9,
+        trajectory_quality=1.0,
+        cost_efficiency=0.8,
+        safety_and_rai=1.0,
+        reasoning="All dimensional scores good",
+        rubric_items=[RubricItemVerdict(index=0, verdict="pass", evidence="ok")],
+        claimed_actions=[
+            ClaimedAction(
+                claim="updated the configuration file",
+                supported=False,
+                evidence="No write_config tool call found in executed tools",
+            )
+        ],
+    )
+    res = await run_evaluation(case, trace)
+    assert res.passed is False
+    assert any("unsupported claim" in f for f in res.failures)
+    claim_failures = [fd for fd in res.failure_details if fd.code == FailureCode.UNSUPPORTED_CLAIM]
+    assert len(claim_failures) == 1
+    cf = claim_failures[0]
+    assert cf.claim == "updated the configuration file"
+    assert cf.evidence == "No write_config tool call found in executed tools"
+
+
+@pytest.mark.asyncio
+@patch("traceeval.metrics.trajectory_judge.evaluate_dimensions")
+async def test_run_evaluation_multiple_gate2_failures_additive(mock_eval_dimensions):
+    case = EDDTestCase(
+        case_id="case_multi", input_prompt="Prompt", expected_tool_calls=[],
+        trajectory_mode=TrajectoryMode.IN_ORDER, rubric=["rubric 1"],
+    )
+    trace = AgentTrace(
+        session_id="s1", triggered_skills=[], executed_tools=[],
+        final_output="Output", total_token_cost_usd=0.01,
+    )
+    mock_eval_dimensions.return_value = EvaluationDimensionScore(
+        intent_satisfaction=0.5,  # below threshold
+        functional_correctness=0.9,
+        trajectory_quality=1.0,
+        cost_efficiency=0.8,
+        safety_and_rai=1.0,
+        reasoning="Multiple problems",
+        rubric_items=[RubricItemVerdict(index=0, verdict="fail", evidence="rubric failed")],
+        claimed_actions=[ClaimedAction(claim="performed action", supported=False, evidence="no tool call")],
+    )
+    res = await run_evaluation(case, trace, score_threshold=0.8)
+    assert res.passed is False
+    codes = [fd.code for fd in res.failure_details]
+    assert FailureCode.RUBRIC_ITEM_FAILED in codes
+    assert FailureCode.UNSUPPORTED_CLAIM in codes
+    assert FailureCode.JUDGE_BELOW_THRESHOLD in codes
 
 
 # --- Flexible arg matching: _field_matches / _tool_matches via validate_trajectory ---
@@ -1050,4 +1218,43 @@ def test_validate_forbidden_args_multikey_and_logic():
     # Both match -> Fails
     full = [ToolCall(tool_name="issue_refund", args={"amount": "100", "reason": "fraud"})]
     assert validate_forbidden_tools(full, case).passed is False
+
+
+def test_evaluation_dimension_score_reasoning_coercion_dict():
+    # Test dict input is coerced with sorted keys
+    score = EvaluationDimensionScore(
+        reasoning={"intent_satisfaction": "Met user need", "functional_correctness": "Accurate output"},
+        rubric_items=[],
+        claimed_actions=[],
+    )
+    assert score.reasoning == "functional_correctness: Accurate output\nintent_satisfaction: Met user need"
+
+    # Test via JSON deserialization
+    raw_json = (
+        '{"intent_satisfaction": 0.9, "functional_correctness": 0.9, '
+        '"trajectory_quality": 0.9, "cost_efficiency": 0.9, "safety_and_rai": 0.9, '
+        '"reasoning": {"b_dim": "reason b", "a_dim": "reason a"}, '
+        '"rubric_items": [], "claimed_actions": []}'
+    )
+    validated = EvaluationDimensionScore.model_validate_json(raw_json)
+    assert validated.reasoning == "a_dim: reason a\nb_dim: reason b"
+
+
+def test_evaluation_dimension_score_reasoning_coercion_list():
+    # Test list input is coerced with newlines
+    score = EvaluationDimensionScore(
+        reasoning=["First point of reasoning.", "Second point of reasoning."],
+        rubric_items=[],
+        claimed_actions=[],
+    )
+    assert score.reasoning == "First point of reasoning.\nSecond point of reasoning."
+
+
+def test_evaluation_dimension_score_reasoning_string_preserved():
+    score = EvaluationDimensionScore(
+        reasoning="Straightforward explanation string.",
+        rubric_items=[],
+        claimed_actions=[],
+    )
+    assert score.reasoning == "Straightforward explanation string."
 

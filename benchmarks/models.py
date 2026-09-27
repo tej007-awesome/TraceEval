@@ -7,7 +7,7 @@ generators of new content - see scenarios/AUTHORING.md for the authoring contrac
 """
 from __future__ import annotations
 
-from typing import Dict, List, Literal, Optional
+from typing import Any, Dict, List, Literal, Optional
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -166,8 +166,8 @@ class EvalOutcome(BaseModel):
         "expected_passed != actual_passed (a gate-2 miss or a pipeline false positive), so "
         "failures can be analysed without re-spending."
     )
-    actual_scores: Optional[Dict[str, Optional[float]]] = Field(
-        None, description="The judge's per-dimension scores, saved under the same condition "
+    actual_scores: Optional[Dict[str, Any]] = Field(
+        None, description="The judge's per-dimension scores and verdicts, saved under the same condition "
         "as judge_reasoning."
     )
     is_judge_error: bool = False
