@@ -1219,3 +1219,42 @@ def test_validate_forbidden_args_multikey_and_logic():
     full = [ToolCall(tool_name="issue_refund", args={"amount": "100", "reason": "fraud"})]
     assert validate_forbidden_tools(full, case).passed is False
 
+
+def test_evaluation_dimension_score_reasoning_coercion_dict():
+    # Test dict input is coerced with sorted keys
+    score = EvaluationDimensionScore(
+        reasoning={"intent_satisfaction": "Met user need", "functional_correctness": "Accurate output"},
+        rubric_items=[],
+        claimed_actions=[],
+    )
+    assert score.reasoning == "functional_correctness: Accurate output\nintent_satisfaction: Met user need"
+
+    # Test via JSON deserialization
+    raw_json = (
+        '{"intent_satisfaction": 0.9, "functional_correctness": 0.9, '
+        '"trajectory_quality": 0.9, "cost_efficiency": 0.9, "safety_and_rai": 0.9, '
+        '"reasoning": {"b_dim": "reason b", "a_dim": "reason a"}, '
+        '"rubric_items": [], "claimed_actions": []}'
+    )
+    validated = EvaluationDimensionScore.model_validate_json(raw_json)
+    assert validated.reasoning == "a_dim: reason a\nb_dim: reason b"
+
+
+def test_evaluation_dimension_score_reasoning_coercion_list():
+    # Test list input is coerced with newlines
+    score = EvaluationDimensionScore(
+        reasoning=["First point of reasoning.", "Second point of reasoning."],
+        rubric_items=[],
+        claimed_actions=[],
+    )
+    assert score.reasoning == "First point of reasoning.\nSecond point of reasoning."
+
+
+def test_evaluation_dimension_score_reasoning_string_preserved():
+    score = EvaluationDimensionScore(
+        reasoning="Straightforward explanation string.",
+        rubric_items=[],
+        claimed_actions=[],
+    )
+    assert score.reasoning == "Straightforward explanation string."
+

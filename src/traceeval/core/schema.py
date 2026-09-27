@@ -226,6 +226,15 @@ class EvaluationDimensionScore(BaseModel):
         None, description="List of actions claimed in final output and whether supported by executed tools."
     )
 
+    @field_validator("reasoning", mode="before")
+    @classmethod
+    def _coerce_reasoning(cls, v: Any) -> Any:
+        if isinstance(v, dict):
+            return "\n".join(f"{k}: {v[k]}" for k in sorted(v.keys()))
+        if isinstance(v, list):
+            return "\n".join(str(x) for x in v)
+        return v
+
 class EvaluationResult(BaseModel):
     """The final output payload for TraceEval."""
     case_id: str

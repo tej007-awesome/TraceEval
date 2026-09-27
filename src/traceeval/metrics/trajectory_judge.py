@@ -331,7 +331,7 @@ Return a list "claimed_actions" where each entry has:
 - "evidence": the specific tool call from the trajectory that supports the claim, or an explanation of why no matching call exists
 If the final output makes no claims of actions performed, return an empty list [].
 
-NOTE ON CLAIMED ACTIONS: You see tool NAMES and ARGS only in the Executed Tool Trajectory, never tool results or execution outcomes. You must NOT mark a claim unsupported merely because you cannot see the tool result or outcome. A claim is supported if a tool call that would plausibly perform that action appears in the trajectory. Argument-level correctness is verified elsewhere and is NOT your concern here.
+NOTE ON CLAIMED ACTIONS: You see tool NAMES and ARGS only in the Executed Tool Trajectory, never tool results or execution outcomes. You must NOT mark a claim unsupported merely because you cannot see the tool result or outcome. A claim is supported if a tool call that would plausibly perform that action appears in the trajectory. Argument-level correctness is verified elsewhere and is NOT your concern here. This also applies to outcomes of calls that did occur: if the output claims a result or effect of an action whose tool call IS present in the trajectory (e.g. 'resolved all 2 errors' after an update call), mark it supported — you cannot see outcomes, and unverifiable outcome claims are not unsupported claims. Mark supported: false ONLY when no tool call that could have performed the claimed action appears in the trajectory at all.
 
 3. Numeric Dimension Scores:
 Rate the following dimensions from 0.0 to 1.0 (or null if not applicable) and provide a detailed explanation (reasoning) for your scoring:
