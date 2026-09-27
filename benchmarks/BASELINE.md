@@ -4,6 +4,15 @@ This records the exact scenario set, holdout split, and judge configuration behi
 `benchmarks/baseline_results.json` / `benchmarks/baseline_report.md` - the reference point
 `#6` (and any future harness/prompt change) is measured against.
 
+**This is baseline v2.** It supersedes baseline v1 (freeze commit `a3cc791`, results kept at
+`benchmarks/baseline_v1_results.json` for comparison). Human review of the v1 review queue
+found 6 scenario bugs - items the judge was right (or wrong) about only because the scenario
+itself was broken - fixed in PR #20 (`259de8d`, "fix: scenario bugs found in baseline human
+review (#7)"). v1 numbers for the affected scenarios/operators measured scenario defects, not
+judge quality, so v1 must not be used as the comparison point for `#6` or later changes. See
+"Post-freeze changes" below for each fix, and the "Baseline v1 vs v2" section of
+`benchmarks/baseline_report.md` for the per-operator effect.
+
 **Scenarios are frozen as of this commit.** Any later edit to a file under
 `benchmarks/scenarios/` (including a rubric fix, a new `independent_call_groups` entry, or a
 new scenario) must be recorded in the "Post-freeze changes" section below with a reason and
@@ -11,13 +20,17 @@ the commit that made it. Do not silently edit a scenario file without adding an 
 
 ## Freeze point
 
-- **Commit SHA**: `a3cc79136d1f48d451e98202bc50e9f86c0f7697` (merge of PR #17, "feat:
-  benchmark judge run, attribution, review tooling (#7 phase 1c)", plus its two follow-up
-  review-fix commits `a7865b4` and `5490ae9`)
+- **Commit SHA**: `ab36dfab7c89d66eda73bc0ead13dc593c007369` (merge of PR #20, "fix: scenario
+  bugs found in baseline human review (#7)")
+- **Supersedes**: baseline v1, commit `a3cc79136d1f48d451e98202bc50e9f86c0f7697` (merge of
+  PR #17 plus follow-ups `a7865b4` and `5490ae9`)
 - **Scenario count**: 20 (4 per domain x 5 domains: refunds, search, file_ops, scheduling,
   code_tools)
 
 ## Scenario file hashes (sha256)
+
+Recomputed at the v2 freeze commit. Four files differ from v1: `file_ops_002_any_order_regex`,
+`search_001_in_order_regex`, `search_002_any_order_subset`, `search_004_exact_mode`.
 
 ```
 e923b779cba5ef55708b49522193109b4b0aa57f91ebcf1147d508b37cdd7c9a  benchmarks/scenarios/code_tools/code_tools_001_in_order_subset.json
@@ -63,14 +76,32 @@ domain):
 - **Seed** (operator mutation RNG, distinct from the holdout seed above): `0`
 - **k** (judge repeats per item): `3`
 - **Concurrency**: `8`
-- **Cache**: refreshed for this run (`--refresh-cache`) - the scenario set changed since the
-  phase 1c pilot/full runs (rubric literal fixes, `independent_call_groups` additions), so
-  this baseline recomputes every judge call from scratch rather than mixing in
-  pre-freeze-content cache entries.
+- **Cost cap**: `--max-total-cost-usd 2.00`
+- **Cache**: refreshed for this run (`--refresh-cache`) - four scenario files and the regex
+  operator's conforming-value generator changed since v1, so this baseline recomputes every
+  judge call from scratch rather than mixing in v1-content cache entries.
+
+Command:
+
+```
+python -m benchmarks.run --seed 0 --k 3 --include-holdout --concurrency 8 \
+  --max-total-cost-usd 2.00 --refresh-cache --output benchmarks/baseline_results.json
+```
 
 ## Post-freeze changes
 
-### PR "fix: scenario bugs found in baseline human review (#7)"
+These entries record changes made after the v1 freeze. Baseline v2 was frozen *after* all of
+them; any change from here on gets a new entry below, dated against the v2 freeze commit.
+
+### PR #20 "fix: scenario bugs found in baseline human review (#7)" (included in v2)
+
+- **`benchmarks/operators.py`** (`regex_conforming_variable_value` generator, not a scenario
+  file, listed because it changes benign items):
+  - **Reason**: The conforming-value generator only matched `^https://host/.*$` patterns and
+    replaced the path with unrelated pages (e.g. `docs.example.com/company-info`), so the
+    "benign" variant cited an irrelevant page and the judge correctly failed it. It now
+    varies the original URL (query/fragment/sub-path) and only keeps candidates the pattern
+    still matches.
 
 - **`benchmarks/scenarios/file_ops/file_ops_002_any_order_regex.json`**:
   - **Reason**: Clean trace called `write_environment_var` instead of updating `/etc/config/app.json` as requested in the prompt, and contained the typo "environment environment configuration" in `final_output`. Fixed by consistently using `write_config_value` with the filepath in `expected_tool_calls`, `forbidden_args`, and `executed_tools`, and corrected `final_output` to confirm updating `/etc/config/app.json`.
