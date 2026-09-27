@@ -49,7 +49,7 @@ f53933c2dea73ee2dea8bde14621e07e2092f051d2bd32274becd11c6fe382d8  benchmarks/sce
 2b47d6e5f05a2184d692011a8acf1189b388ff5ee238c0e9b0219344ac2fdc7d  benchmarks/scenarios/scheduling/scheduling_002_any_order_subset.json
 fb872face6507863613602a39159c559ab3edfbe123ff61466a13a5e368b24bd  benchmarks/scenarios/scheduling/scheduling_003_any_order_any.json
 0ef452f17c2d1e9cdabd2071013330ce655ece1aea4ae89d774d21d71643f67a  benchmarks/scenarios/scheduling/scheduling_004_exact_mode.json
-06dceaf92f3fd40d7aa0efafab7fcd8ff57da8cb67899cfb0635c8f93bc7a653  benchmarks/scenarios/search/search_001_in_order_regex.json
+805781b8d49969f3c18a1ccccf9ef8b6ae512c21628a38547250087c0b83e485  benchmarks/scenarios/search/search_001_in_order_regex.json
 420ff13947764248bff8cc08093340e8615b876396681bdae3dc564559caf273  benchmarks/scenarios/search/search_002_any_order_subset.json
 a621dc7c10db8699eddd38578dd7b721992c6c2f6d5eac7afe12e6ffe13373fd  benchmarks/scenarios/search/search_003_any_order_multi.json
 3a24b5809530e46448f38963825d892ae217f8cc9c7d2f9b6a36444e0fe9d240  benchmarks/scenarios/search/search_004_exact_mode.json
@@ -114,3 +114,8 @@ them; any change from here on gets a new entry below, dated against the v2 freez
 
 - **`benchmarks/scenarios/search/search_004_exact_mode.json`**:
   - **Reason**: The `rubric_item_ignored` variant attempted to omit policy document `SOC2-SEC-09` by citing clause `SOC2-SEC-09-A`, but because the clause code contains the policy code as a substring, the information was not actually removed. Updated variant to target omission of clause extraction (rubric item 2) so the required information is completely removed.
+
+### PR "fix: search_001 substantive multi-release clean output (#7)"
+
+- **`benchmarks/scenarios/search/search_001_in_order_regex.json`**:
+  - **Reason**: The clean `final_output` only covered a single release and provided a thin summary of API changes, failing benign items when the prompt requested documentation and API changes for SDK releases (plural). Expanded the clean output (and updated all gate-2 variants and paraphrase to stay consistent) to substantively cover multiple 2026 releases (v3.0 major and v3.1 incremental) with concrete API changes (token-level streaming callbacks, strict JSON Schema 2020-12 tool validation, async multi-agent pipelines, session persistence hooks, and token-budget guards), while preserving rubric criteria and variant detectability rules.
